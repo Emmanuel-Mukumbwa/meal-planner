@@ -8,7 +8,7 @@ PantryPilot is a modern kitchen management application built with Next.js 15, Ai
 - **AI Recipe Importer**: Paste any URL to extract ingredients and steps.
 - **Smart Meal Suggester**: AI logic that checks your pantry before recommending recipes.
 - **Auto-Restock Shopping List**: One-click generation of shopping lists for low-stock items.
-- **Analytics Dashboard**: Track waste, savings, and consumption habits.
+- **Analytics Dashboard**: Track waste, savings, and consumption habits in Malawi Kwacha (MK).
 
 ## 🛠 Tech Stack
 - **Framework**: Next.js 15 (App Router)
