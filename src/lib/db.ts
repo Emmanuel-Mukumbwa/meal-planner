@@ -2,14 +2,21 @@
 import mysql from 'mysql2/promise';
 
 /**
- * Robust SSL configuration for Aiven/Vercel.
- * Handles certificate strings with both literal newlines and escaped \n characters.
+ * Flexible SSL configuration.
+ * If DB_SSL_CA is provided, it uses it for strict verification.
+ * Otherwise, it uses a generic SSL connection which is often sufficient for cloud databases.
  */
 const getSSLConfig = () => {
   const ca = process.env.DB_SSL_CA;
-  if (!ca) return undefined;
   
-  // Clean and format the CA string to handle Vercel environment variable quirks
+  if (!ca) {
+    // Return simple SSL enabled if no CA provided - works for most cloud MySQL
+    return {
+      rejectUnauthorized: false
+    };
+  }
+  
+  // Clean and format the CA string if provided
   const formattedCa = ca
     .replace(/\\n/g, '\n')
     .replace(/\r/g, '')
@@ -31,7 +38,7 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-  connectTimeout: 20000, // Increased timeout for cloud connections
+  connectTimeout: 20000,
 });
 
 export default pool;

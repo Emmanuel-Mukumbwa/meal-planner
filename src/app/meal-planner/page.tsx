@@ -38,15 +38,26 @@ export default function MealPlannerPage() {
       const inventory = await getInventoryItems()
       const recipes = await getRecipes()
 
+      if (inventory.length === 0 || recipes.length === 0) {
+        toast({ 
+          variant: "destructive", 
+          title: "Missing Data", 
+          description: "Please add inventory items and recipes first." 
+        })
+        setLoadingSuggestions(false)
+        return
+      }
+
       const result = await suggestMealsFromInventory({
         inventory: inventory.map(i => ({
           name: i.name,
           quantity: Number(i.quantity),
           unit: i.unit,
-          expiryDate: i.expiryDate
+          expiryDate: i.expiryDate ? new Date(i.expiryDate).toISOString() : undefined
         })),
         recipes: recipes.map(r => ({
           name: r.name,
+          description: r.description,
           ingredients: r.ingredients.map(ing => ({
             name: ing.name,
             quantity: Number(ing.quantity),
@@ -56,7 +67,12 @@ export default function MealPlannerPage() {
       })
       setSuggestions(result)
     } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: "Check your Aiven MySQL connection." })
+      console.error("Meal Planner Error:", error)
+      toast({ 
+        variant: "destructive", 
+        title: "AI Analysis Error", 
+        description: "Could not generate suggestions. Ensure GOOGLE_GENAI_API_KEY is set in Vercel." 
+      })
     } finally {
       setLoadingSuggestions(false)
     }
@@ -68,7 +84,7 @@ export default function MealPlannerPage() {
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-3xl font-bold font-headline tracking-tight">Meal Planner</h1>
-            <p className="text-muted-foreground">Real-time planning with AI & Aiven MySQL.</p>
+            <p className="text-muted-foreground">Plan your week based on what's in your Aiven database.</p>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="icon" onClick={() => setSelectedWeek(d => addDays(d, -7))}>
@@ -114,36 +130,56 @@ export default function MealPlannerPage() {
 
           <TabsContent value="suggestions" className="mt-6">
             <div className="space-y-6">
-              <Button onClick={handleSuggest} disabled={loadingSuggestions} className="gap-2">
-                {loadingSuggestions ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                Generate Smart Suggestions
-              </Button>
+              <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-3xl bg-muted/30">
+                <Sparkles className="h-10 w-10 text-primary mb-4" />
+                <h3 className="text-lg font-bold">Smart Inventory Matching</h3>
+                <p className="text-muted-foreground text-center mb-6 max-w-md">
+                  We'll compare your current Aiven MySQL inventory with your saved recipes to see what you can cook today.
+                </p>
+                <Button onClick={handleSuggest} disabled={loadingSuggestions} size="lg" className="gap-2">
+                  {loadingSuggestions ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                  Generate Smart Suggestions
+                </Button>
+              </div>
 
-              {suggestions ? (
+              {suggestions && (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                   {suggestions.suggestions.map((suggestion, idx) => (
-                    <Card key={idx} className="overflow-hidden border-none shadow-md">
-                      <CardHeader>
+                    <Card key={idx} className="overflow-hidden border-none shadow-md hover:shadow-lg transition-shadow">
+                      <CardHeader className="bg-primary/5">
                         <CardTitle className="text-lg font-headline">{suggestion.recipeName}</CardTitle>
+                        {suggestion.recipeDescription && (
+                           <CardDescription className="line-clamp-2">{suggestion.recipeDescription}</CardDescription>
+                        )}
                       </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2">
+                      <CardContent className="pt-4">
+                        <div className="space-y-3">
+                          <p className="text-xs font-bold text-muted-foreground uppercase">Ingredient Status</p>
                           {suggestion.ingredientStatus.map((status, sIdx) => (
                             <div key={sIdx} className="flex items-center justify-between text-sm">
                               <span className="flex items-center gap-2">
-                                {status.status === 'enough' ? <CheckCircle2 className="h-3 w-3 text-accent" /> : <AlertCircle className="h-3 w-3 text-destructive" />}
+                                {status.status === 'enough' ? (
+                                  <CheckCircle2 className="h-4 w-4 text-primary" />
+                                ) : status.status === 'low' ? (
+                                  <AlertCircle className="h-4 w-4 text-orange-500" />
+                                ) : (
+                                  <AlertCircle className="h-4 w-4 text-destructive" />
+                                )}
                                 {status.name}
                               </span>
+                              <Badge variant="outline" className={
+                                status.status === 'enough' ? 'border-primary text-primary' :
+                                status.status === 'low' ? 'border-orange-500 text-orange-500' :
+                                'border-destructive text-destructive'
+                              }>
+                                {status.status === 'enough' ? 'Ready' : status.status === 'low' ? 'Low' : 'Needed'}
+                              </Badge>
                             </div>
                           ))}
                         </div>
                       </CardContent>
                     </Card>
                   ))}
-                </div>
-              ) : !loadingSuggestions && (
-                <div className="text-center py-20 border-2 border-dashed rounded-3xl">
-                  <p>Click the button above to analyze your database and get suggestions.</p>
                 </div>
               )}
             </div>

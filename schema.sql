@@ -1,24 +1,20 @@
 
--- PantryPilot Database Schema
--- Run this in your Aiven MySQL console
+-- Use this script in your Aiven MySQL Console to create the required tables.
 
-CREATE DATABASE IF NOT EXISTS pantry_pilot;
-USE pantry_pilot;
-
--- Inventory Table
+-- 1. Inventory Table (Includes Price Tracking)
 CREATE TABLE IF NOT EXISTS inventory (
   id VARCHAR(36) PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
-  quantity DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  quantity DECIMAL(10, 2) NOT NULL,
   unit VARCHAR(50) NOT NULL,
   category VARCHAR(100) NOT NULL,
   expiryDate DATETIME,
   lowStockThreshold DECIMAL(10, 2) DEFAULT 1,
-  price DECIMAL(10, 2) DEFAULT 0, -- Price column for tracking expenses
+  price DECIMAL(10, 2) DEFAULT 0,
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Recipes Table
+-- 2. Recipes Table
 CREATE TABLE IF NOT EXISTS recipes (
   id VARCHAR(36) PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
@@ -26,17 +22,17 @@ CREATE TABLE IF NOT EXISTS recipes (
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Recipe Ingredients Table
+-- 3. Recipe Ingredients
 CREATE TABLE IF NOT EXISTS recipe_ingredients (
   id VARCHAR(36) PRIMARY KEY,
   recipe_id VARCHAR(36),
   name VARCHAR(255) NOT NULL,
-  quantity DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  quantity DECIMAL(10, 2) NOT NULL,
   unit VARCHAR(50) NOT NULL,
   FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
 );
 
--- Recipe Steps Table
+-- 4. Recipe Steps
 CREATE TABLE IF NOT EXISTS recipe_steps (
   id VARCHAR(36) PRIMARY KEY,
   recipe_id VARCHAR(36),
@@ -45,22 +41,22 @@ CREATE TABLE IF NOT EXISTS recipe_steps (
   FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
 );
 
--- Shopping List Table
+-- 5. Shopping List Table
 CREATE TABLE IF NOT EXISTS shopping_list (
   id VARCHAR(36) PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
-  quantity DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  quantity DECIMAL(10, 2) NOT NULL,
   unit VARCHAR(50) NOT NULL,
   completed BOOLEAN DEFAULT FALSE,
-  category VARCHAR(100) NOT NULL,
+  category VARCHAR(100),
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Leftovers Table
+-- 6. Leftovers Table
 CREATE TABLE IF NOT EXISTS leftovers (
   id VARCHAR(36) PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
-  type ENUM('Meat', 'Vegetables', 'Soup', 'Grain', 'Dairy', 'Other') NOT NULL,
+  type VARCHAR(50) NOT NULL,
   storedAt DATETIME NOT NULL,
   expiresAt DATETIME NOT NULL,
   status ENUM('frozen', 'consumed', 'discarded') DEFAULT 'frozen',
