@@ -1,0 +1,56 @@
+-- SQL Script to generate database and tables for PantryPilot
+CREATE DATABASE IF NOT EXISTS pantry_pilot;
+USE pantry_pilot;
+
+-- Inventory Table
+CREATE TABLE IF NOT EXISTS inventory (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  quantity DECIMAL(10, 2) NOT NULL,
+  unit VARCHAR(50) NOT NULL,
+  category VARCHAR(100) NOT NULL,
+  expiryDate DATETIME,
+  lowStockThreshold DECIMAL(10, 2) DEFAULT 0,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Recipes Table
+CREATE TABLE IF NOT EXISTS recipes (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  prepTime VARCHAR(50),
+  cookTime VARCHAR(50),
+  servings VARCHAR(50),
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Recipe Ingredients
+CREATE TABLE IF NOT EXISTS recipe_ingredients (
+  id VARCHAR(36) PRIMARY KEY,
+  recipe_id VARCHAR(36),
+  name VARCHAR(255) NOT NULL,
+  quantity DECIMAL(10, 2),
+  unit VARCHAR(50),
+  FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
+);
+
+-- Recipe Steps
+CREATE TABLE IF NOT EXISTS recipe_steps (
+  id VARCHAR(36) PRIMARY KEY,
+  recipe_id VARCHAR(36),
+  step_number INT,
+  instruction TEXT,
+  FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
+);
+
+-- Shopping List Table
+CREATE TABLE IF NOT EXISTS shopping_list (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  quantity DECIMAL(10, 2) NOT NULL,
+  unit VARCHAR(50) NOT NULL,
+  completed BOOLEAN DEFAULT FALSE,
+  category VARCHAR(100),
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

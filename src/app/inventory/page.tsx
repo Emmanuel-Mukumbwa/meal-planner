@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import { AppLayout } from "@/components/layout/app-layout"
-import { MOCK_INVENTORY } from "@/app/lib/mock-data"
 import { 
   Table, 
   TableBody, 
@@ -20,7 +19,8 @@ import {
   MoreVertical, 
   Filter, 
   ArrowUpDown,
-  CircleAlert
+  CircleAlert,
+  Loader2
 } from "lucide-react"
 import { 
   DropdownMenu,
@@ -29,10 +29,28 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu"
 import { format, isPast, isWithinInterval, addDays } from "date-fns"
+import { getInventoryItems, addInventoryItem, deleteInventoryItem } from "@/app/actions/inventory-actions"
+import { InventoryItem } from "@/app/lib/types"
 
 export default function InventoryPage() {
-  const [items, setItems] = React.useState(MOCK_INVENTORY)
+  const [items, setItems] = React.useState<InventoryItem[]>([])
+  const [loading, setLoading] = React.useState(true)
   const [search, setSearch] = React.useState("")
+
+  React.useEffect(() => {
+    loadItems()
+  }, [])
+
+  const loadItems = async () => {
+    const data = await getInventoryItems()
+    setItems(data)
+    setLoading(false)
+  }
+
+  const handleDelete = async (id: string) => {
+    await deleteInventoryItem(id)
+    setItems(items.filter(i => i.id !== id))
+  }
 
   const filteredItems = items.filter(item => 
     item.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -70,7 +88,7 @@ export default function InventoryPage() {
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-3xl font-bold font-headline tracking-tight">Inventory</h1>
-            <p className="text-muted-foreground">Manage and track your grocery stock levels.</p>
+            <p className="text-muted-foreground">Manage and track your grocery stock levels in MySQL.</p>
           </div>
           <Button className="w-full md:w-auto bg-primary">
             <Plus className="mr-2 h-4 w-4" /> Add New Item
@@ -98,69 +116,75 @@ export default function InventoryPage() {
         </div>
 
         <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
-          <Table>
-            <TableHeader className="bg-muted/30">
-              <TableRow>
-                <TableHead className="font-semibold">Item Name</TableHead>
-                <TableHead className="font-semibold">Category</TableHead>
-                <TableHead className="font-semibold">Stock Level</TableHead>
-                <TableHead className="font-semibold">Expiry Date</TableHead>
-                <TableHead className="font-semibold">Status</TableHead>
-                <TableHead className="text-right"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredItems.map((item) => (
-                <TableRow key={item.id} className="transition-colors hover:bg-muted/20">
-                  <TableCell className="font-medium">{item.name}</TableCell>
-                  <TableCell>
-                    <Badge variant="secondary" className="font-normal">
-                      {item.category}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <span className={item.quantity <= item.lowStockThreshold ? "text-destructive font-bold" : ""}>
-                        {item.quantity} {item.unit}
-                      </span>
-                      {item.quantity <= item.lowStockThreshold && (
-                        <CircleAlert className="h-4 w-4 text-destructive" />
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {item.expiryDate ? format(new Date(item.expiryDate), 'MMM d, yyyy') : 'N/A'}
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={getStatusColor(item.expiryDate, item.quantity, item.lowStockThreshold)}>
-                      {getStatusLabel(item.expiryDate, item.quantity, item.lowStockThreshold)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>Edit Item</DropdownMenuItem>
-                        <DropdownMenuItem>Deduct Quantity</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive">Delete</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {filteredItems.length === 0 && (
+          {loading ? (
+            <div className="flex items-center justify-center h-64">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <Table>
+              <TableHeader className="bg-muted/30">
                 <TableRow>
-                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
-                    No items found. Try a different search.
-                  </TableCell>
+                  <TableHead className="font-semibold">Item Name</TableHead>
+                  <TableHead className="font-semibold">Category</TableHead>
+                  <TableHead className="font-semibold">Stock Level</TableHead>
+                  <TableHead className="font-semibold">Expiry Date</TableHead>
+                  <TableHead className="font-semibold">Status</TableHead>
+                  <TableHead className="text-right"></TableHead>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredItems.map((item) => (
+                  <TableRow key={item.id} className="transition-colors hover:bg-muted/20">
+                    <TableCell className="font-medium">{item.name}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="font-normal">
+                        {item.category}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <span className={item.quantity <= item.lowStockThreshold ? "text-destructive font-bold" : ""}>
+                          {item.quantity} {item.unit}
+                        </span>
+                        {item.quantity <= item.lowStockThreshold && (
+                          <CircleAlert className="h-4 w-4 text-destructive" />
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {item.expiryDate ? format(new Date(item.expiryDate), 'MMM d, yyyy') : 'N/A'}
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={getStatusColor(item.expiryDate, item.quantity, item.lowStockThreshold)}>
+                        {getStatusLabel(item.expiryDate, item.quantity, item.lowStockThreshold)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem>Edit Item</DropdownMenuItem>
+                          <DropdownMenuItem>Deduct Quantity</DropdownMenuItem>
+                          <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(item.id)}>Delete</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {filteredItems.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                      No items found. Try a different search.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
         </div>
       </div>
     </AppLayout>
