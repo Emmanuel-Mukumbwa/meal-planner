@@ -1,0 +1,22 @@
+{
+  "placeholderImages": [
+    {
+      "id": "hero-dashboard",
+      "description": "Clean kitchen with organized pantry",
+      "imageUrl": "https://picsum.photos/seed/pantry1/1200/400",
+      "imageHint": "pantry kitchen"
+    },
+    {
+      "id": "fresh-vegetables",
+      "description": "Variety of fresh greens and vegetables",
+      "imageUrl": "https://picsum.photos/seed/veg1/400/300",
+      "imageHint": "fresh vegetables"
+    },
+    {
+      "id": "dairy-products",
+      "description": "Milk, cheese and yogurt assortment",
+      "imageUrl": "https://picsum.photos/seed/dairy1/400/300",
+      "imageHint": "dairy milk"
+    }
+  ]
+}
