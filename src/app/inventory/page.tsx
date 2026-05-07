@@ -18,10 +18,9 @@ import {
   Plus, 
   Search, 
   MoreVertical, 
-  Filter, 
-  ArrowUpDown,
   CircleAlert,
-  Loader2
+  Loader2,
+  Banknote
 } from "lucide-react"
 import { 
   DropdownMenu,
@@ -58,7 +57,8 @@ export default function InventoryPage() {
     unit: "pcs",
     category: "Pantry",
     expiryDate: "",
-    lowStockThreshold: 1
+    lowStockThreshold: 1,
+    price: 0
   })
 
   React.useEffect(() => {
@@ -67,10 +67,12 @@ export default function InventoryPage() {
 
   const loadItems = async () => {
     try {
+      setLoading(true)
       const data = await getInventoryItems()
       setItems(data)
     } catch (error) {
       console.error("Failed to load items:", error)
+      toast({ variant: "destructive", title: "Connection Error", description: "Could not fetch inventory from database." })
     } finally {
       setLoading(false)
     }
@@ -83,14 +85,15 @@ export default function InventoryPage() {
         ...newItem,
         quantity: Number(newItem.quantity),
         lowStockThreshold: Number(newItem.lowStockThreshold),
+        price: Number(newItem.price),
         expiryDate: newItem.expiryDate || undefined
       })
       setItems([added as InventoryItem, ...items])
       setIsDialogOpen(false)
-      setNewItem({ name: "", quantity: 1, unit: "pcs", category: "Pantry", expiryDate: "", lowStockThreshold: 1 })
-      toast({ title: "Item Added", description: `${newItem.name} added to inventory.` })
+      setNewItem({ name: "", quantity: 1, unit: "pcs", category: "Pantry", expiryDate: "", lowStockThreshold: 1, price: 0 })
+      toast({ title: "Item Added", description: `${newItem.name} added to your Aiven database.` })
     } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: "Failed to add item to database." })
+      toast({ variant: "destructive", title: "Error", description: "Failed to add item. Check your database settings." })
     }
   }
 
@@ -140,7 +143,7 @@ export default function InventoryPage() {
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-3xl font-bold font-headline tracking-tight">Inventory</h1>
-            <p className="text-muted-foreground">Manage and track your grocery stock levels in MySQL.</p>
+            <p className="text-muted-foreground">Real-time stock management with Malawi Kwacha tracking.</p>
           </div>
           
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -152,12 +155,12 @@ export default function InventoryPage() {
             <DialogContent className="sm:max-w-[425px]">
               <DialogHeader>
                 <DialogTitle>Add Inventory Item</DialogTitle>
-                <DialogDescription>Enter the details of the new grocery item.</DialogDescription>
+                <DialogDescription>Add a new grocery item to your Aiven MySQL database.</DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
                   <label className="text-sm font-medium">Name</label>
-                  <Input placeholder="Milk" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} />
+                  <Input placeholder="e.g., Rice, Milk, Chicken" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
@@ -166,24 +169,30 @@ export default function InventoryPage() {
                   </div>
                   <div className="grid gap-2">
                     <label className="text-sm font-medium">Unit</label>
-                    <Input placeholder="liters" value={newItem.unit} onChange={e => setNewItem({...newItem, unit: e.target.value})} />
+                    <Input placeholder="kg, liters, pcs" value={newItem.unit} onChange={e => setNewItem({...newItem, unit: e.target.value})} />
                   </div>
                 </div>
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">Category</label>
-                  <Select value={newItem.category} onValueChange={v => setNewItem({...newItem, category: v})}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Dairy">Dairy</SelectItem>
-                      <SelectItem value="Vegetables">Vegetables</SelectItem>
-                      <SelectItem value="Meat">Meat</SelectItem>
-                      <SelectItem value="Pantry">Pantry</SelectItem>
-                      <SelectItem value="Fruits">Fruits</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium">Price (MK)</label>
+                    <Input type="number" placeholder="0.00" value={newItem.price} onChange={e => setNewItem({...newItem, price: Number(e.target.value)})} />
+                  </div>
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium">Category</label>
+                    <Select value={newItem.category} onValueChange={v => setNewItem({...newItem, category: v})}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Dairy">Dairy</SelectItem>
+                        <SelectItem value="Vegetables">Vegetables</SelectItem>
+                        <SelectItem value="Meat">Meat</SelectItem>
+                        <SelectItem value="Pantry">Pantry</SelectItem>
+                        <SelectItem value="Fruits">Fruits</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <div className="grid gap-2">
                   <label className="text-sm font-medium">Expiry Date (Optional)</label>
@@ -192,7 +201,7 @@ export default function InventoryPage() {
               </div>
               <DialogFooter>
                 <Button variant="ghost" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-                <Button onClick={handleAdd} disabled={!newItem.name}>Add to Database</Button>
+                <Button onClick={handleAdd} disabled={!newItem.name}>Save to Database</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -202,7 +211,7 @@ export default function InventoryPage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input 
-              placeholder="Search items by name or category..." 
+              placeholder="Search database..." 
               className="pl-9"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -212,8 +221,9 @@ export default function InventoryPage() {
 
         <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
           {loading ? (
-            <div className="flex items-center justify-center h-64">
+            <div className="flex flex-col items-center justify-center h-64 gap-2">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Connecting to Aiven MySQL...</p>
             </div>
           ) : (
             <Table>
@@ -222,7 +232,7 @@ export default function InventoryPage() {
                   <TableHead className="font-semibold">Item Name</TableHead>
                   <TableHead className="font-semibold">Category</TableHead>
                   <TableHead className="font-semibold">Stock Level</TableHead>
-                  <TableHead className="font-semibold">Expiry Date</TableHead>
+                  <TableHead className="font-semibold">Price (MK)</TableHead>
                   <TableHead className="font-semibold">Status</TableHead>
                   <TableHead className="text-right"></TableHead>
                 </TableRow>
@@ -246,8 +256,11 @@ export default function InventoryPage() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {item.expiryDate ? format(new Date(item.expiryDate), 'MMM d, yyyy') : 'N/A'}
+                    <TableCell>
+                      <div className="flex items-center gap-1 text-sm font-medium">
+                        <Banknote className="h-3 w-3 text-primary" />
+                        {new Intl.NumberFormat('en-MW', { style: 'currency', currency: 'MWK' }).format(item.price || 0)}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <Badge className={getStatusColor(item.expiryDate, item.quantity, item.lowStockThreshold)}>
@@ -268,10 +281,10 @@ export default function InventoryPage() {
                     </TableCell>
                   </TableRow>
                 ))}
-                {!loading && filteredItems.length === 0 && (
+                {filteredItems.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
-                      No items found in your Aiven database.
+                      Your pantry is empty. Click "Add New Item" to begin.
                     </TableCell>
                   </TableRow>
                 )}
