@@ -1,24 +1,24 @@
 
--- SQL Script for PantryPilot Database Setup
--- Execute these commands in your Aiven MySQL Console
+-- PantryPilot Database Schema
+-- Run this in your Aiven MySQL console
 
 CREATE DATABASE IF NOT EXISTS pantry_pilot;
 USE pantry_pilot;
 
--- 1. Inventory Table (Stores current stock)
+-- Inventory Table
 CREATE TABLE IF NOT EXISTS inventory (
   id VARCHAR(36) PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
-  quantity DECIMAL(10,2) NOT NULL,
+  quantity DECIMAL(10, 2) NOT NULL DEFAULT 0,
   unit VARCHAR(50) NOT NULL,
-  category VARCHAR(100),
+  category VARCHAR(100) NOT NULL,
   expiryDate DATETIME,
-  lowStockThreshold DECIMAL(10,2) DEFAULT 1.0,
-  price DECIMAL(10,2) DEFAULT 0.0, -- Added price column
+  lowStockThreshold DECIMAL(10, 2) DEFAULT 1,
+  price DECIMAL(10, 2) DEFAULT 0, -- Price column for tracking expenses
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 2. Recipes Table
+-- Recipes Table
 CREATE TABLE IF NOT EXISTS recipes (
   id VARCHAR(36) PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
@@ -26,17 +26,17 @@ CREATE TABLE IF NOT EXISTS recipes (
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 3. Recipe Ingredients Table
+-- Recipe Ingredients Table
 CREATE TABLE IF NOT EXISTS recipe_ingredients (
   id VARCHAR(36) PRIMARY KEY,
   recipe_id VARCHAR(36),
   name VARCHAR(255) NOT NULL,
-  quantity DECIMAL(10,2) NOT NULL,
+  quantity DECIMAL(10, 2) NOT NULL DEFAULT 0,
   unit VARCHAR(50) NOT NULL,
   FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
 );
 
--- 4. Recipe Steps Table
+-- Recipe Steps Table
 CREATE TABLE IF NOT EXISTS recipe_steps (
   id VARCHAR(36) PRIMARY KEY,
   recipe_id VARCHAR(36),
@@ -45,18 +45,18 @@ CREATE TABLE IF NOT EXISTS recipe_steps (
   FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
 );
 
--- 5. Shopping List Table
+-- Shopping List Table
 CREATE TABLE IF NOT EXISTS shopping_list (
   id VARCHAR(36) PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
-  quantity DECIMAL(10,2) NOT NULL,
+  quantity DECIMAL(10, 2) NOT NULL DEFAULT 0,
   unit VARCHAR(50) NOT NULL,
-  completed TINYINT(1) DEFAULT 0,
-  category VARCHAR(100),
+  completed BOOLEAN DEFAULT FALSE,
+  category VARCHAR(100) NOT NULL,
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 6. Leftovers Table (Freezer Tracking)
+-- Leftovers Table
 CREATE TABLE IF NOT EXISTS leftovers (
   id VARCHAR(36) PRIMARY KEY,
   name VARCHAR(255) NOT NULL,

@@ -1,51 +1,70 @@
+
 'use server';
 
 import pool from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 import { Recipe } from '@/app/lib/types';
+import { revalidatePath } from 'next/cache';
 
 export async function getRecipes(): Promise<Recipe[]> {
-  const [recipes] = await pool.execute('SELECT * FROM recipes ORDER BY createdAt DESC');
-  const allRecipes = recipes as any[];
+  try {
+    const [recipes] = await pool.execute('SELECT * FROM recipes ORDER BY createdAt DESC');
+    const allRecipes = recipes as any[];
 
-  const results = await Promise.all(allRecipes.map(async (recipe) => {
-    const [ingredients] = await pool.execute('SELECT name, quantity, unit FROM recipe_ingredients WHERE recipe_id = ?', [recipe.id]);
-    const [steps] = await pool.execute('SELECT instruction FROM recipe_steps WHERE recipe_id = ? ORDER BY step_number ASC', [recipe.id]);
-    
-    return {
-      ...recipe,
-      ingredients: ingredients as any[],
-      steps: (steps as any[]).map(s => s.instruction)
-    };
-  }));
+    const results = await Promise.all(allRecipes.map(async (recipe) => {
+      const [ingredients] = await pool.execute('SELECT name, quantity, unit FROM recipe_ingredients WHERE recipe_id = ?', [recipe.id]);
+      const [steps] = await pool.execute('SELECT instruction FROM recipe_steps WHERE recipe_id = ? ORDER BY step_number ASC', [recipe.id]);
+      
+      return {
+        ...recipe,
+        ingredients: ingredients as any[],
+        steps: (steps as any[]).map(s => s.instruction)
+      };
+    }));
 
-  return results as Recipe[];
+    return results as Recipe[];
+  } catch (error) {
+    console.error('Database error in getRecipes:', error);
+    return [];
+  }
 }
 
 export async function addRecipe(recipe: Omit<Recipe, 'id'>) {
-  const recipeId = uuidv4();
-  await pool.execute(
-    'INSERT INTO recipes (id, name, description) VALUES (?, ?, ?)',
-    [recipeId, recipe.name, recipe.description || null]
-  );
-
-  for (const ingredient of recipe.ingredients) {
+  try {
+    const recipeId = uuidv4();
     await pool.execute(
-      'INSERT INTO recipe_ingredients (id, recipe_id, name, quantity, unit) VALUES (?, ?, ?, ?, ?)',
-      [uuidv4(), recipeId, ingredient.name, ingredient.quantity, ingredient.unit]
+      'INSERT INTO recipes (id, name, description) VALUES (?, ?, ?)',
+      [recipeId, recipe.name, recipe.description || null]
     );
-  }
 
-  for (let i = 0; i < recipe.steps.length; i++) {
-    await pool.execute(
-      'INSERT INTO recipe_steps (id, recipe_id, step_number, instruction) VALUES (?, ?, ?, ?)',
-      [uuidv4(), recipeId, i + 1, recipe.steps[i]]
-    );
-  }
+    for (const ingredient of recipe.ingredients) {
+      await pool.execute(
+        'INSERT INTO recipe_ingredients (id, recipe_id, name, quantity, unit) VALUES (?, ?, ?, ?, ?)',
+        [uuidv4(), recipeId, ingredient.name, Number(ingredient.quantity) || 0, ingredient.unit]
+      );
+    }
 
-  return { id: recipeId, ...recipe };
+    for (let i = 0; i < recipe.steps.length; i++) {
+      await pool.execute(
+        'INSERT INTO recipe_steps (id, recipe_id, step_number, instruction) VALUES (?, ?, ?, ?)',
+        [uuidv4(), recipeId, i + 1, recipe.steps[i]]
+      );
+    }
+
+    revalidatePath('/recipes');
+    return { id: recipeId, ...recipe };
+  } catch (error) {
+    console.error('Database error in addRecipe:', error);
+    throw new Error('Failed to save recipe.');
+  }
 }
 
 export async function deleteRecipe(id: string) {
-  await pool.execute('DELETE FROM recipes WHERE id = ?', [id]);
+  try {
+    await pool.execute('DELETE FROM recipes WHERE id = ?', [id]);
+    revalidatePath('/recipes');
+  } catch (error) {
+    console.error('Database error in deleteRecipe:', error);
+    throw new Error('Failed to delete recipe.');
+  }
 }

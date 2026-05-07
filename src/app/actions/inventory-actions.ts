@@ -17,19 +17,20 @@ export async function getInventoryItems(): Promise<InventoryItem[]> {
 }
 
 export async function addInventoryItem(item: Omit<InventoryItem, 'id'>) {
-  const id = uuidv4();
   try {
+    const id = uuidv4();
+    // Use coalesce/default values to ensure numeric fields aren't null
     await pool.execute(
       'INSERT INTO inventory (id, name, quantity, unit, category, expiryDate, lowStockThreshold, price) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [
         id, 
         item.name, 
-        item.quantity, 
+        Number(item.quantity) || 0, 
         item.unit, 
         item.category, 
         item.expiryDate || null, 
-        item.lowStockThreshold || 1,
-        item.price || 0
+        Number(item.lowStockThreshold) || 1,
+        Number(item.price) || 0
       ]
     );
     revalidatePath('/inventory');
@@ -37,7 +38,7 @@ export async function addInventoryItem(item: Omit<InventoryItem, 'id'>) {
     return { id, ...item };
   } catch (error) {
     console.error('Database error in addInventoryItem:', error);
-    throw new Error('Failed to add item to database.');
+    throw new Error('Failed to add item. Ensure the "price" column exists in your database.');
   }
 }
 
@@ -48,6 +49,7 @@ export async function updateInventoryItem(id: string, updates: Partial<Inventory
     if (fields) {
       await pool.execute(`UPDATE inventory SET ${fields} WHERE id = ?`, [...values, id]);
       revalidatePath('/inventory');
+      revalidatePath('/');
     }
   } catch (error) {
     console.error('Database error in updateInventoryItem:', error);
@@ -59,6 +61,7 @@ export async function deleteInventoryItem(id: string) {
   try {
     await pool.execute('DELETE FROM inventory WHERE id = ?', [id]);
     revalidatePath('/inventory');
+    revalidatePath('/');
   } catch (error) {
     console.error('Database error in deleteInventoryItem:', error);
     throw new Error('Failed to delete item.');

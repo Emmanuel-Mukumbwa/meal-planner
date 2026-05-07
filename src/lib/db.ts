@@ -1,13 +1,19 @@
 
 import mysql from 'mysql2/promise';
 
-// Helper to handle SSL certificate string formatting for Aiven/Vercel
+/**
+ * Robust SSL configuration for Aiven/Vercel.
+ * Handles certificate strings with both literal newlines and escaped \n characters.
+ */
 const getSSLConfig = () => {
   const ca = process.env.DB_SSL_CA;
   if (!ca) return undefined;
   
-  // Replace literal \n strings or handle actual newlines
-  const formattedCa = ca.replace(/\\n/g, '\n');
+  // Clean and format the CA string to handle Vercel environment variable quirks
+  const formattedCa = ca
+    .replace(/\\n/g, '\n')
+    .replace(/\r/g, '')
+    .trim();
   
   return {
     ca: formattedCa,
@@ -25,7 +31,7 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-  connectTimeout: 10000, // 10s timeout
+  connectTimeout: 20000, // Increased timeout for cloud connections
 });
 
 export default pool;
