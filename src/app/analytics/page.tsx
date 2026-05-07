@@ -25,6 +25,7 @@ import {
   ShoppingCart,
   CheckCircle2
 } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 
 const usageData = [
   { name: "Mon", usage: 45 },
@@ -61,7 +62,7 @@ export default function AnalyticsPage() {
                <Trash2 className="h-4 w-4 text-destructive" />
              </CardHeader>
              <CardContent>
-               <div className="text-2xl font-bold">$12.40</div>
+               <div className="text-2xl font-bold">MK 12,400</div>
                <div className="flex items-center text-xs text-destructive">
                  <ArrowUpRight className="h-3 w-3 mr-1" />
                  +2.5% from last month
@@ -74,7 +75,7 @@ export default function AnalyticsPage() {
                <DollarSign className="h-4 w-4 text-accent" />
              </CardHeader>
              <CardContent>
-               <div className="text-2xl font-bold">$45.80</div>
+               <div className="text-2xl font-bold">MK 45,800</div>
                <div className="flex items-center text-xs text-primary">
                  <ArrowDownRight className="h-3 w-3 mr-1" />
                  -15% reduced waste

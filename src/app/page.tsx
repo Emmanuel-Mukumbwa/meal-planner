@@ -1,4 +1,3 @@
-
 "use client"
 
 import * as React from "react"
@@ -30,7 +29,7 @@ export default function Dashboard() {
             <TrendingDown className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">$124.50</div>
+            <div className="text-2xl font-bold">MK 124,500</div>
             <p className="text-xs text-muted-foreground">-4% from last week</p>
           </CardContent>
         </Card>
