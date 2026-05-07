@@ -91,7 +91,7 @@ export default function InventoryPage() {
       setItems([added as InventoryItem, ...items])
       setIsDialogOpen(false)
       setNewItem({ name: "", quantity: 1, unit: "pcs", category: "Pantry", expiryDate: "", lowStockThreshold: 1, price: 0 })
-      toast({ title: "Item Added", description: `${newItem.name} added to your Aiven database.` })
+      toast({ title: "Item Added", description: `${newItem.name} saved successfully.` })
     } catch (error) {
       toast({ variant: "destructive", title: "Error", description: "Failed to add item. Check your database settings." })
     }
@@ -143,7 +143,7 @@ export default function InventoryPage() {
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-3xl font-bold font-headline tracking-tight">Inventory</h1>
-            <p className="text-muted-foreground">Real-time stock management with Malawi Kwacha tracking.</p>
+            <p className="text-muted-foreground">Manage your pantry stock and values in Malawi Kwacha.</p>
           </div>
           
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -155,7 +155,7 @@ export default function InventoryPage() {
             <DialogContent className="sm:max-w-[425px]">
               <DialogHeader>
                 <DialogTitle>Add Inventory Item</DialogTitle>
-                <DialogDescription>Add a new grocery item to your Aiven MySQL database.</DialogDescription>
+                <DialogDescription>Store a new item in your Aiven MySQL database.</DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
@@ -211,7 +211,7 @@ export default function InventoryPage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input 
-              placeholder="Search database..." 
+              placeholder="Search inventory..." 
               className="pl-9"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -223,7 +223,7 @@ export default function InventoryPage() {
           {loading ? (
             <div className="flex flex-col items-center justify-center h-64 gap-2">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Connecting to Aiven MySQL...</p>
+              <p className="text-sm text-muted-foreground">Connecting to database...</p>
             </div>
           ) : (
             <Table>
@@ -284,7 +284,7 @@ export default function InventoryPage() {
                 {filteredItems.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
-                      Your pantry is empty. Click "Add New Item" to begin.
+                      No items found. Click "Add New Item" to begin.
                     </TableCell>
                   </TableRow>
                 )}

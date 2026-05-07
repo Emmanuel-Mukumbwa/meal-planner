@@ -2,15 +2,13 @@
 import mysql from 'mysql2/promise';
 
 /**
- * Flexible SSL configuration.
- * Hardened for Vercel deployment where DB_SSL_CA might be literal string or escaped.
+ * Flexible SSL configuration for Aiven/Vercel.
  */
 const getSSLConfig = () => {
   const ca = process.env.DB_SSL_CA;
   
   if (!ca) {
-    // Aiven and many cloud providers require SSL. 
-    // This allows insecure fallback if CA is missing but SSL is required.
+    // Fallback for secure connection without explicit certificate validation
     return {
       rejectUnauthorized: false
     };
@@ -24,7 +22,7 @@ const getSSLConfig = () => {
   
   return {
     ca: formattedCa,
-    rejectUnauthorized: false, // Set to false to allow connection if certificate verification fails
+    rejectUnauthorized: false, 
   };
 };
 

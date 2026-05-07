@@ -19,7 +19,6 @@ export async function getInventoryItems(): Promise<InventoryItem[]> {
 export async function addInventoryItem(item: Omit<InventoryItem, 'id'>) {
   try {
     const id = uuidv4();
-    // Use coalesce/default values to ensure numeric fields aren't null
     await pool.execute(
       'INSERT INTO inventory (id, name, quantity, unit, category, expiryDate, lowStockThreshold, price) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [
@@ -38,7 +37,7 @@ export async function addInventoryItem(item: Omit<InventoryItem, 'id'>) {
     return { id, ...item };
   } catch (error) {
     console.error('Database error in addInventoryItem:', error);
-    throw new Error('Failed to add item. Ensure the "price" column exists in your database.');
+    throw new Error('Failed to add item. Check if the "price" column exists in your database.');
   }
 }
 

@@ -4,7 +4,6 @@
 import * as React from "react"
 import { AppLayout } from "@/components/layout/app-layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { 
   AlertTriangle, 
@@ -12,7 +11,6 @@ import {
   Utensils, 
   ChefHat, 
   TrendingDown,
-  ShoppingCart,
   Snowflake,
   Loader2,
   Banknote
@@ -62,7 +60,9 @@ export default function Dashboard() {
   return (
     <AppLayout>
       {stats.loading ? (
-        <div className="flex h-96 items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>
+        <div className="flex h-96 items-center justify-center">
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        </div>
       ) : (
         <div className="space-y-6">
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
