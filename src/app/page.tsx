@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -18,7 +19,6 @@ import {
   ShoppingCart
 } from "lucide-react"
 import Link from "next/link"
-import Image from "next/image"
 
 export default function Dashboard() {
   return (
@@ -109,22 +109,30 @@ export default function Dashboard() {
             <CardDescription>Manage your inventory on the go</CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-3">
-            <Button className="h-24 flex-col gap-2 bg-primary text-primary-foreground hover:opacity-90 transition-opacity">
-              <Plus className="h-6 w-6" />
-              <span>Add Item</span>
-            </Button>
-            <Button variant="outline" className="h-24 flex-col gap-2 border-primary/20 hover:bg-primary/5">
-              <Search className="h-6 w-6 text-primary" />
-              <span>Lookup</span>
-            </Button>
-            <Button variant="outline" className="h-24 flex-col gap-2 border-primary/20 hover:bg-primary/5">
-              <Utensils className="h-6 w-6 text-primary" />
-              <span>Scan Recipe</span>
-            </Button>
-            <Button variant="outline" className="h-24 flex-col gap-2 border-accent/40 bg-accent/5 hover:bg-accent/10">
-              <ChefHat className="h-6 w-6 text-primary" />
-              <span>AI Suggest</span>
-            </Button>
+            <Link href="/inventory" className="w-full h-full">
+              <Button className="w-full h-24 flex-col gap-2 bg-primary text-primary-foreground hover:opacity-90 transition-opacity">
+                <Plus className="h-6 w-6" />
+                <span>Add Item</span>
+              </Button>
+            </Link>
+            <Link href="/inventory" className="w-full h-full">
+              <Button variant="outline" className="w-full h-24 flex-col gap-2 border-primary/20 hover:bg-primary/5">
+                <Search className="h-6 w-6 text-primary" />
+                <span>Lookup</span>
+              </Button>
+            </Link>
+            <Link href="/recipes" className="w-full h-full">
+              <Button variant="outline" className="w-full h-24 flex-col gap-2 border-primary/20 hover:bg-primary/5">
+                <Utensils className="h-6 w-6 text-primary" />
+                <span>Scan Recipe</span>
+              </Button>
+            </Link>
+            <Link href="/meal-planner" className="w-full h-full">
+              <Button variant="outline" className="w-full h-24 flex-col gap-2 border-accent/40 bg-accent/5 hover:bg-accent/10">
+                <ChefHat className="h-6 w-6 text-primary" />
+                <span>AI Suggest</span>
+              </Button>
+            </Link>
           </CardContent>
         </Card>
       </div>
@@ -160,7 +168,7 @@ export default function Dashboard() {
                   Get creative with what's already in your fridge to reduce food waste.
                 </p>
               </div>
-              <Link href="/meal-planner?tab=suggestions">
+              <Link href="/meal-planner">
                 <Button variant="default" className="w-fit bg-primary hover:bg-primary/90">
                   Try AI Suggestions
                 </Button>
