@@ -16,7 +16,8 @@ import {
   TrendingDown,
   Timer,
   Search,
-  ShoppingCart
+  ShoppingCart,
+  Snowflake
 } from "lucide-react"
 import Link from "next/link"
 
@@ -46,12 +47,12 @@ export default function Dashboard() {
         </Card>
         <Card className="border-l-4 border-l-destructive shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Low Stock</CardTitle>
-            <TrendingDown className="h-4 w-4 text-destructive" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Frozen Leftovers</CardTitle>
+            <Snowflake className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">8 Items</div>
-            <p className="text-xs text-muted-foreground">Action required</p>
+            <div className="text-2xl font-bold">12 Meals</div>
+            <p className="text-xs text-muted-foreground">2 Need reheating soon</p>
           </CardContent>
         </Card>
         <Card className="border-l-4 border-l-primary shadow-sm">
@@ -106,7 +107,7 @@ export default function Dashboard() {
         <Card className="lg:col-span-3 shadow-sm border-none bg-white">
           <CardHeader>
             <CardTitle className="font-headline">Quick Actions</CardTitle>
-            <CardDescription>Manage your inventory on the go</CardDescription>
+            <CardDescription>Manage your kitchen inventory</CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-3">
             <Link href="/inventory" className="w-full h-full">
@@ -115,16 +116,16 @@ export default function Dashboard() {
                 <span>Add Item</span>
               </Button>
             </Link>
-            <Link href="/inventory" className="w-full h-full">
+            <Link href="/leftovers" className="w-full h-full">
               <Button variant="outline" className="w-full h-24 flex-col gap-2 border-primary/20 hover:bg-primary/5">
-                <Search className="h-6 w-6 text-primary" />
-                <span>Lookup</span>
+                <Snowflake className="h-6 w-6 text-primary" />
+                <span>Freeze Leftover</span>
               </Button>
             </Link>
             <Link href="/recipes" className="w-full h-full">
               <Button variant="outline" className="w-full h-24 flex-col gap-2 border-primary/20 hover:bg-primary/5">
                 <Utensils className="h-6 w-6 text-primary" />
-                <span>Scan Recipe</span>
+                <span>Import Recipe</span>
               </Button>
             </Link>
             <Link href="/meal-planner" className="w-full h-full">
@@ -144,7 +145,7 @@ export default function Dashboard() {
               <div>
                 <h3 className="text-2xl font-bold font-headline mb-2">Smart Grocery List</h3>
                 <p className="text-primary-foreground/80 text-sm max-w-xs">
-                  We've automatically added 5 low-stock items to your shopping list.
+                  We've automatically added low-stock items to your shopping list.
                 </p>
               </div>
               <Link href="/shopping-list">
@@ -163,19 +164,19 @@ export default function Dashboard() {
           <div className="relative p-6">
              <div className="relative z-10 flex flex-col justify-between h-full space-y-6">
               <div>
-                <h3 className="text-2xl font-bold font-headline mb-2 text-primary">AI Meal Suggester</h3>
+                <h3 className="text-2xl font-bold font-headline mb-2 text-primary">Freezer Reminder</h3>
                 <p className="text-primary/70 text-sm max-w-xs">
-                  Get creative with what's already in your fridge to reduce food waste.
+                  You have leftovers reaching their storage limit. Check them now!
                 </p>
               </div>
-              <Link href="/meal-planner">
+              <Link href="/leftovers">
                 <Button variant="default" className="w-fit bg-primary hover:bg-primary/90">
-                  Try AI Suggestions
+                  Check Freezer
                 </Button>
               </Link>
             </div>
              <div className="absolute right-0 bottom-0 opacity-10 transform translate-x-1/4 translate-y-1/4">
-               <ChefHat className="w-48 h-48" />
+               <Snowflake className="w-48 h-48" />
             </div>
           </div>
         </Card>

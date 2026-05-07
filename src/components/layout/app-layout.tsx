@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -11,9 +12,8 @@ import {
   UtensilsCrossed, 
   BarChart3,
   Search,
-  PlusCircle,
   Bell,
-  Menu
+  Snowflake
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -35,6 +35,7 @@ import { Badge } from "@/components/ui/badge"
 const navItems = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Inventory", href: "/inventory", icon: Warehouse },
+  { name: "Leftovers", href: "/leftovers", icon: Snowflake },
   { name: "Meal Planner", href: "/meal-planner", icon: CalendarDays },
   { name: "Recipes", href: "/recipes", icon: UtensilsCrossed },
   { name: "Shopping List", href: "/shopping-list", icon: ShoppingCart },
@@ -78,7 +79,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="group-data-[collapsible=icon]:hidden flex flex-col gap-2 rounded-xl bg-accent/20 p-4">
             <p className="text-xs font-semibold text-primary">Pro Tip</p>
             <p className="text-[10px] leading-relaxed text-muted-foreground">
-              Add your expiry dates to get early warning alerts!
+              Freeze leftovers to enjoy later and reduce food waste!
             </p>
           </div>
         </SidebarFooter>
@@ -90,7 +91,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <div className="hidden md:flex relative max-w-sm">
               <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input 
-                placeholder="Search inventory..." 
+                placeholder="Search..." 
                 className="pl-8 bg-muted/50 border-none focus-visible:ring-1"
               />
             </div>
