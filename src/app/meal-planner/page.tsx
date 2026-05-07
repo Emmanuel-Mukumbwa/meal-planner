@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -14,10 +15,12 @@ import {
   Sparkles,
   Utensils,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from "lucide-react"
 import { format, addDays, startOfWeek } from "date-fns"
-import { MOCK_INVENTORY, MOCK_RECIPES } from "@/app/lib/mock-data"
+import { getInventoryItems } from "@/app/actions/inventory-actions"
+import { getRecipes } from "@/app/actions/recipe-actions"
 import { suggestMealsFromInventory, SuggestMealsFromInventoryOutput } from "@/ai/flows/suggest-meals-from-inventory"
 import { useToast } from "@/hooks/use-toast"
 
@@ -32,26 +35,28 @@ export default function MealPlannerPage() {
   const handleSuggest = async () => {
     setLoadingSuggestions(true)
     try {
-      // Mapping mock data to input schema format
+      const inventory = await getInventoryItems()
+      const recipes = await getRecipes()
+
       const result = await suggestMealsFromInventory({
-        inventory: MOCK_INVENTORY.map(i => ({
+        inventory: inventory.map(i => ({
           name: i.name,
-          quantity: i.quantity,
+          quantity: Number(i.quantity),
           unit: i.unit,
           expiryDate: i.expiryDate
         })),
-        recipes: MOCK_RECIPES.map(r => ({
+        recipes: recipes.map(r => ({
           name: r.name,
-          ingredients: r.ingredients
+          ingredients: r.ingredients.map(ing => ({
+            name: ing.name,
+            quantity: Number(ing.quantity),
+            unit: ing.unit
+          }))
         }))
       })
       setSuggestions(result)
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to get meal suggestions."
-      })
+      toast({ variant: "destructive", title: "Error", description: "Check your Aiven MySQL connection." })
     } finally {
       setLoadingSuggestions(false)
     }
@@ -63,7 +68,7 @@ export default function MealPlannerPage() {
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-3xl font-bold font-headline tracking-tight">Meal Planner</h1>
-            <p className="text-muted-foreground">Plan your week and reduce grocery waste.</p>
+            <p className="text-muted-foreground">Real-time planning with AI & Aiven MySQL.</p>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="icon" onClick={() => setSelectedWeek(d => addDays(d, -7))}>
@@ -82,13 +87,13 @@ export default function MealPlannerPage() {
         <Tabs defaultValue="week" className="w-full">
           <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
             <TabsTrigger value="week">Weekly Calendar</TabsTrigger>
-            <TabsTrigger value="suggestions" onClick={handleSuggest}>AI Suggestions</TabsTrigger>
+            <TabsTrigger value="suggestions">AI Suggestions</TabsTrigger>
           </TabsList>
           
           <TabsContent value="week" className="mt-6">
             <div className="grid gap-4 md:grid-cols-7">
               {weekDays.map((day) => (
-                <Card key={day.toISOString()} className={`border-none shadow-sm ${format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd') ? 'ring-2 ring-primary ring-offset-2' : ''}`}>
+                <Card key={day.toISOString()} className="border-none shadow-sm">
                   <CardHeader className="p-4 border-b">
                     <CardTitle className="text-sm font-bold text-center">
                       {format(day, 'EEE')}
@@ -97,13 +102,8 @@ export default function MealPlannerPage() {
                   </CardHeader>
                   <CardContent className="p-3 space-y-4">
                     {['Breakfast', 'Lunch', 'Dinner'].map((slot) => (
-                      <div key={slot} className="group relative rounded-lg border border-dashed border-muted-foreground/20 p-2 transition-colors hover:border-primary/40 hover:bg-primary/5">
-                        <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">{slot}</p>
-                        <div className="h-10 flex items-center justify-center">
-                          <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                        </div>
+                      <div key={slot} className="rounded-lg border border-dashed p-2 h-16 flex items-center justify-center opacity-40">
+                        <p className="text-[10px] font-bold uppercase">{slot}</p>
                       </div>
                     ))}
                   </CardContent>
@@ -114,67 +114,36 @@ export default function MealPlannerPage() {
 
           <TabsContent value="suggestions" className="mt-6">
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-xl font-bold font-headline flex items-center gap-2">
-                    <Sparkles className="h-5 w-5 text-accent" />
-                    AI Chef Recommendations
-                  </h2>
-                  <p className="text-sm text-muted-foreground">Based on your current pantry contents</p>
-                </div>
-                <Button onClick={handleSuggest} disabled={loadingSuggestions} variant="outline" className="gap-2">
-                  <Utensils className="h-4 w-4" /> Refresh Suggestions
-                </Button>
-              </div>
+              <Button onClick={handleSuggest} disabled={loadingSuggestions} className="gap-2">
+                {loadingSuggestions ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                Generate Smart Suggestions
+              </Button>
 
-              {loadingSuggestions ? (
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                  {[1, 2, 3].map(i => (
-                    <Card key={i} className="animate-pulse h-64 bg-muted/20" />
-                  ))}
-                </div>
-              ) : suggestions ? (
+              {suggestions ? (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                   {suggestions.suggestions.map((suggestion, idx) => (
-                    <Card key={idx} className="overflow-hidden border-none shadow-md transition-all hover:shadow-lg">
-                      <div className="h-32 bg-accent/20 relative flex items-center justify-center">
-                         <Utensils className="h-12 w-12 text-primary/30" />
-                         <Badge className="absolute top-2 right-2 bg-primary">95% Match</Badge>
-                      </div>
+                    <Card key={idx} className="overflow-hidden border-none shadow-md">
                       <CardHeader>
                         <CardTitle className="text-lg font-headline">{suggestion.recipeName}</CardTitle>
-                        <CardDescription className="line-clamp-2">{suggestion.recipeDescription || 'A delicious meal idea based on your available ingredients.'}</CardDescription>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-2">
-                          <p className="text-xs font-bold uppercase text-muted-foreground">Ingredient Status</p>
                           {suggestion.ingredientStatus.map((status, sIdx) => (
                             <div key={sIdx} className="flex items-center justify-between text-sm">
                               <span className="flex items-center gap-2">
-                                {status.status === 'enough' ? (
-                                  <CheckCircle2 className="h-3 w-3 text-accent" />
-                                ) : (
-                                  <AlertCircle className="h-3 w-3 text-destructive" />
-                                )}
+                                {status.status === 'enough' ? <CheckCircle2 className="h-3 w-3 text-accent" /> : <AlertCircle className="h-3 w-3 text-destructive" />}
                                 {status.name}
-                              </span>
-                              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                                status.status === 'enough' ? 'bg-accent/10 text-primary' : 'bg-destructive/10 text-destructive'
-                              }`}>
-                                {status.status === 'enough' ? 'In Stock' : 'Needed'}
                               </span>
                             </div>
                           ))}
                         </div>
-                        <Button className="w-full mt-6 bg-primary">Add to Plan</Button>
                       </CardContent>
                     </Card>
                   ))}
                 </div>
-              ) : (
+              ) : !loadingSuggestions && (
                 <div className="text-center py-20 border-2 border-dashed rounded-3xl">
-                  <Utensils className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-lg font-medium">Click "Refresh Suggestions" to see what you can cook today!</p>
+                  <p>Click the button above to analyze your database and get suggestions.</p>
                 </div>
               )}
             </div>

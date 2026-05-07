@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -17,46 +18,60 @@ import {
   Loader2,
   Trash2
 } from "lucide-react"
-import { MOCK_RECIPES } from "@/app/lib/mock-data"
-import { importRecipeFromURL, ImportRecipeFromURLOutput } from "@/ai/flows/import-recipe-from-url"
+import { getRecipes, addRecipe, deleteRecipe } from "@/app/actions/recipe-actions"
+import { Recipe } from "@/app/lib/types"
+import { importRecipeFromURL } from "@/ai/flows/import-recipe-from-url"
 import { useToast } from "@/hooks/use-toast"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
 
 export default function RecipesPage() {
   const { toast } = useToast()
-  const [recipes, setRecipes] = React.useState(MOCK_RECIPES)
+  const [recipes, setRecipes] = React.useState<Recipe[]>([])
+  const [loading, setLoading] = React.useState(true)
   const [url, setUrl] = React.useState("")
   const [isImporting, setIsImporting] = React.useState(false)
   const [isDialogOpen, setIsDialogOpen] = React.useState(false)
+
+  React.useEffect(() => {
+    loadRecipes()
+  }, [])
+
+  const loadRecipes = async () => {
+    try {
+      const data = await getRecipes()
+      setRecipes(data)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleImport = async () => {
     if (!url) return
     setIsImporting(true)
     try {
       const result = await importRecipeFromURL({ url })
-      const newRecipe = {
-        id: Math.random().toString(),
+      const recipeData = {
         name: result.title,
         description: `Serves: ${result.servings || 'N/A'}, Prep: ${result.prepTime || 'N/A'}`,
         ingredients: result.ingredients.map(i => ({ name: i, quantity: 1, unit: 'unit' })),
         steps: result.steps
       }
-      setRecipes([newRecipe, ...recipes])
+      const saved = await addRecipe(recipeData)
+      setRecipes([saved as Recipe, ...recipes])
       setIsDialogOpen(false)
       setUrl("")
-      toast({
-        title: "Recipe Imported!",
-        description: `Successfully added ${result.title} to your collection.`
-      })
+      toast({ title: "Recipe Imported!", description: `Successfully added ${result.title}.` })
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Import Failed",
-        description: "Could not extract recipe from the provided URL."
-      })
+      toast({ variant: "destructive", title: "Import Failed", description: "Could not extract recipe." })
     } finally {
       setIsImporting(false)
     }
+  }
+
+  const handleDelete = async (id: string) => {
+    await deleteRecipe(id)
+    setRecipes(recipes.filter(r => r.id !== id))
+    toast({ title: "Recipe Deleted" })
   }
 
   return (
@@ -65,7 +80,7 @@ export default function RecipesPage() {
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-3xl font-bold font-headline tracking-tight">Recipe Book</h1>
-            <p className="text-muted-foreground">Discover, import, and manage your favorite meals.</p>
+            <p className="text-muted-foreground">Discover and manage your meals using Aiven MySQL.</p>
           </div>
           <div className="flex gap-2">
              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -77,84 +92,53 @@ export default function RecipesPage() {
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Import Recipe</DialogTitle>
-                  <DialogDescription>
-                    Paste a recipe URL and our AI will extract the ingredients and steps for you.
-                  </DialogDescription>
+                  <DialogDescription>Paste a URL and our AI will extract the ingredients.</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Recipe Link</label>
-                    <Input 
-                      placeholder="https://example.com/best-lasagna" 
-                      value={url}
-                      onChange={(e) => setUrl(e.target.value)}
-                    />
-                  </div>
+                  <Input placeholder="https://..." value={url} onChange={(e) => setUrl(e.target.value)} />
                 </div>
                 <DialogFooter>
                   <Button variant="ghost" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-                  <Button 
-                    onClick={handleImport} 
-                    disabled={isImporting || !url}
-                    className="bg-primary"
-                  >
+                  <Button onClick={handleImport} disabled={isImporting || !url}>
                     {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Import className="mr-2 h-4 w-4" />}
-                    Import Recipe
+                    Import
                   </Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-            <Button className="bg-primary">
-              <Plus className="mr-2 h-4 w-4" /> Create Manual
-            </Button>
           </div>
         </div>
 
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Search recipes by name or ingredient..." className="pl-10 h-12 rounded-xl bg-white shadow-sm border-none" />
-        </div>
-
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {recipes.map((recipe) => (
-            <Card key={recipe.id} className="group overflow-hidden border-none shadow-sm transition-all hover:shadow-md bg-white">
-              <div className="h-40 bg-muted flex items-center justify-center relative">
-                 <ChefHat className="h-16 w-16 text-primary/10 group-hover:scale-110 transition-transform" />
-                 <div className="absolute top-3 left-3 flex gap-1">
-                   <Badge variant="secondary" className="bg-white/90 backdrop-blur-sm text-primary">Dinner</Badge>
-                 </div>
-                 <Button 
-                  variant="destructive" 
-                  size="icon" 
-                  className="absolute top-3 right-3 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={() => setRecipes(recipes.filter(r => r.id !== recipe.id))}
-                >
-                   <Trash2 className="h-4 w-4" />
-                 </Button>
-              </div>
-              <CardHeader className="pb-2">
-                <CardTitle className="font-headline text-lg group-hover:text-primary transition-colors">{recipe.name}</CardTitle>
-                <CardDescription className="line-clamp-1">{recipe.description || 'A quick and healthy home-cooked meal.'}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-4 text-xs text-muted-foreground mb-4">
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" /> 25 mins
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Users className="h-3 w-3" /> 4 portions
-                  </div>
-                  <Badge variant="outline" className="ml-auto text-[10px] font-normal border-accent/40 text-primary">
+        {loading ? (
+          <div className="flex justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {recipes.map((recipe) => (
+              <Card key={recipe.id} className="group overflow-hidden border-none shadow-sm bg-white">
+                <div className="h-32 bg-muted flex items-center justify-center relative">
+                   <ChefHat className="h-12 w-12 text-primary/10" />
+                   <Button variant="destructive" size="icon" className="absolute top-3 right-3 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleDelete(recipe.id)}>
+                     <Trash2 className="h-4 w-4" />
+                   </Button>
+                </div>
+                <CardHeader>
+                  <CardTitle className="font-headline text-lg">{recipe.name}</CardTitle>
+                  <CardDescription className="line-clamp-2">{recipe.description}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Badge variant="outline" className="text-primary border-accent/40">
                     {recipe.ingredients.length} Ingredients
                   </Badge>
-                </div>
-                <Button variant="secondary" className="w-full bg-secondary hover:bg-accent/20 transition-colors">
-                  View Details
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                </CardContent>
+              </Card>
+            ))}
+            {recipes.length === 0 && (
+              <div className="col-span-full py-20 text-center border-2 border-dashed rounded-3xl">
+                <p className="text-muted-foreground">No recipes found. Try importing one!</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </AppLayout>
   )

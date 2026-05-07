@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -28,28 +29,79 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu"
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogFooter, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger 
+} from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { format, isPast, isWithinInterval, addDays } from "date-fns"
 import { getInventoryItems, addInventoryItem, deleteInventoryItem } from "@/app/actions/inventory-actions"
 import { InventoryItem } from "@/app/lib/types"
+import { useToast } from "@/hooks/use-toast"
 
 export default function InventoryPage() {
+  const { toast } = useToast()
   const [items, setItems] = React.useState<InventoryItem[]>([])
   const [loading, setLoading] = React.useState(true)
   const [search, setSearch] = React.useState("")
+  const [isDialogOpen, setIsDialogOpen] = React.useState(false)
+
+  // New Item State
+  const [newItem, setNewItem] = React.useState({
+    name: "",
+    quantity: 1,
+    unit: "pcs",
+    category: "Pantry",
+    expiryDate: "",
+    lowStockThreshold: 1
+  })
 
   React.useEffect(() => {
     loadItems()
   }, [])
 
   const loadItems = async () => {
-    const data = await getInventoryItems()
-    setItems(data)
-    setLoading(false)
+    try {
+      const data = await getInventoryItems()
+      setItems(data)
+    } catch (error) {
+      console.error("Failed to load items:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleAdd = async () => {
+    if (!newItem.name) return
+    try {
+      const added = await addInventoryItem({
+        ...newItem,
+        quantity: Number(newItem.quantity),
+        lowStockThreshold: Number(newItem.lowStockThreshold),
+        expiryDate: newItem.expiryDate || undefined
+      })
+      setItems([added as InventoryItem, ...items])
+      setIsDialogOpen(false)
+      setNewItem({ name: "", quantity: 1, unit: "pcs", category: "Pantry", expiryDate: "", lowStockThreshold: 1 })
+      toast({ title: "Item Added", description: `${newItem.name} added to inventory.` })
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error", description: "Failed to add item to database." })
+    }
   }
 
   const handleDelete = async (id: string) => {
-    await deleteInventoryItem(id)
-    setItems(items.filter(i => i.id !== id))
+    try {
+      await deleteInventoryItem(id)
+      setItems(items.filter(i => i.id !== id))
+      toast({ title: "Item Deleted" })
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error", description: "Failed to delete item." })
+    }
   }
 
   const filteredItems = items.filter(item => 
@@ -90,9 +142,60 @@ export default function InventoryPage() {
             <h1 className="text-3xl font-bold font-headline tracking-tight">Inventory</h1>
             <p className="text-muted-foreground">Manage and track your grocery stock levels in MySQL.</p>
           </div>
-          <Button className="w-full md:w-auto bg-primary">
-            <Plus className="mr-2 h-4 w-4" /> Add New Item
-          </Button>
+          
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="w-full md:w-auto bg-primary">
+                <Plus className="mr-2 h-4 w-4" /> Add New Item
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Add Inventory Item</DialogTitle>
+                <DialogDescription>Enter the details of the new grocery item.</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Name</label>
+                  <Input placeholder="Milk" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium">Quantity</label>
+                    <Input type="number" value={newItem.quantity} onChange={e => setNewItem({...newItem, quantity: Number(e.target.value)})} />
+                  </div>
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium">Unit</label>
+                    <Input placeholder="liters" value={newItem.unit} onChange={e => setNewItem({...newItem, unit: e.target.value})} />
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Category</label>
+                  <Select value={newItem.category} onValueChange={v => setNewItem({...newItem, category: v})}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Dairy">Dairy</SelectItem>
+                      <SelectItem value="Vegetables">Vegetables</SelectItem>
+                      <SelectItem value="Meat">Meat</SelectItem>
+                      <SelectItem value="Pantry">Pantry</SelectItem>
+                      <SelectItem value="Fruits">Fruits</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Expiry Date (Optional)</label>
+                  <Input type="date" value={newItem.expiryDate} onChange={e => setNewItem({...newItem, expiryDate: e.target.value})} />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
+                <Button onClick={handleAdd} disabled={!newItem.name}>Add to Database</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
 
         <div className="flex flex-col gap-4 md:flex-row md:items-center">
@@ -104,14 +207,6 @@ export default function InventoryPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm">
-              <Filter className="mr-2 h-4 w-4" /> Filter
-            </Button>
-            <Button variant="outline" size="sm">
-              <ArrowUpDown className="mr-2 h-4 w-4" /> Sort
-            </Button>
           </div>
         </div>
 
@@ -167,18 +262,16 @@ export default function InventoryPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>Edit Item</DropdownMenuItem>
-                          <DropdownMenuItem>Deduct Quantity</DropdownMenuItem>
                           <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(item.id)}>Delete</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))}
-                {filteredItems.length === 0 && (
+                {!loading && filteredItems.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
-                      No items found. Try a different search.
+                      No items found in your Aiven database.
                     </TableCell>
                   </TableRow>
                 )}
