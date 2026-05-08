@@ -66,3 +66,19 @@ CREATE TABLE IF NOT EXISTS shopping_list (
     category VARCHAR(100),
     createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id VARCHAR(36) PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    type ENUM('leftover_reminder', 'leftover_overdue', 'system') NOT NULL DEFAULT 'leftover_reminder',
+    relatedType VARCHAR(50),
+    relatedId VARCHAR(36),
+    notifyAt DATETIME NOT NULL,
+    isRead TINYINT(1) DEFAULT 0,
+    readAt DATETIME NULL,
+    createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_notifyAt (notifyAt),
+    INDEX idx_isRead (isRead),
+    INDEX idx_relatedId (relatedId)
+);
