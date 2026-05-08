@@ -15,7 +15,7 @@
     --secondary: 120 20% 90%;
     --secondary-foreground: 123 25% 20%;
     --muted: 120 10% 90%;
-    --muted-foreground: 123 10% 40%;
+    --muted-foreground: 123 10% 40%; 
     --accent: 86 66% 63%; /* #A7DE66 */
     --accent-foreground: 123 25% 10%;
     --destructive: 0 84.2% 60.2%;
@@ -32,6 +32,20 @@
     --sidebar-accent-foreground: 123 25% 38%;
     --sidebar-border: 120 10% 90%;
     --sidebar-ring: 123 25% 38%;
+  }
+}
+
+@layer utilities {
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
   }
 }
 
