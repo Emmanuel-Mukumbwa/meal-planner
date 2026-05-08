@@ -1,4 +1,3 @@
-//src/app/lib/types.ts
 export type InventoryItem = {
   id: string;
   name: string;
@@ -7,12 +6,12 @@ export type InventoryItem = {
   category: string;
   expiryDate?: string;
   lowStockThreshold: number;
-  price: number; // Added price
+  price: number;
 };
 
 export type Recipe = {
   id: string;
-  name: string; 
+  name: string;
   description?: string;
   ingredients: {
     name: string;
@@ -24,7 +23,19 @@ export type Recipe = {
 
 export type MealPlanSlot = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 
-export type LeftoverType = 'Meat' | 'Vegetables' | 'Soup' | 'Grain' | 'Dairy' | 'Other';
+export type LeftoverType =
+  | 'Meat'
+  | 'Vegetables'
+  | 'Soup'
+  | 'Grain'
+  | 'Dairy'
+  | 'Potatoes'
+  | 'Cereals'
+  | 'Pasta'
+  | 'Rice'
+  | 'Noodles'
+  | 'Beverage'
+  | 'Other';
 
 export type Leftover = {
   id: string;

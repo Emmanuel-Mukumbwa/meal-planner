@@ -35,13 +35,20 @@ import {
 } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 
+// Updated storage guidelines (in days) – more realistic for frozen leftovers
 const STORAGE_GUIDELINES: Record<LeftoverType, number> = {
-  Meat: 90,
-  Vegetables: 180,
+  Meat: 60,
+  Vegetables: 30,
   Soup: 60,
   Grain: 30,
   Dairy: 30,
-  Other: 60,
+  Potatoes: 30,    // cooked mashed or roasted potatoes
+  Cereals: 30,     // cooked porridge, oats
+  Pasta: 30,       // cooked pasta dishes
+  Rice: 30,        // cooked rice
+  Noodles: 30,     // cooked noodles
+  Beverage: 14,    // smoothies, juices – separate, may degrade faster
+  Other: 30,
 }
 
 type EstimateState = {
@@ -185,7 +192,7 @@ export default function LeftoversPage() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Food Name</label>
                   <Input
-                    placeholder="e.g., Sunday Roast Chicken"
+                    placeholder="e.g., Irish potato mash, Spaghetti bolognese, Smoothie"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                   />
@@ -211,11 +218,11 @@ export default function LeftoversPage() {
                   <div className="flex items-center gap-3">
                     <Clock className="h-5 w-5 text-primary" />
                     <p className="text-xs">
-                      Base guideline: <strong>{guidelineDays} days</strong> for {type}
+                      Recommended storage: <strong>{guidelineDays} days</strong> for {type}
                     </p>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    The server will refine this using the food name, then clamp it to a safe range.
+                    AI may adjust based on the food name, but won't exceed 90 days.
                   </p>
                 </div>
 
