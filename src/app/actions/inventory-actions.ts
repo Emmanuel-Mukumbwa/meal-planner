@@ -1,4 +1,3 @@
-//src/app/actions/inventory-actions.ts
 'use server';
 
 import pool from '@/lib/db';
@@ -14,7 +13,7 @@ export async function getInventoryItems(): Promise<InventoryItem[]> {
     console.error('Database error in getInventoryItems:', error);
     return [];
   }
-}
+} 
 
 export async function addInventoryItem(item: Omit<InventoryItem, 'id'>) {
   try {
@@ -64,5 +63,18 @@ export async function deleteInventoryItem(id: string) {
   } catch (error) {
     console.error('Database error in deleteInventoryItem:', error);
     throw new Error('Failed to delete item.');
+  }
+}
+
+// New function: get items that are at or below their low stock threshold
+export async function getLowStockItems(): Promise<InventoryItem[]> {
+  try {
+    const [rows] = await pool.execute(
+      'SELECT * FROM inventory WHERE quantity <= lowStockThreshold ORDER BY name ASC'
+    );
+    return rows as InventoryItem[];
+  } catch (error) {
+    console.error('Database error in getLowStockItems:', error);
+    return [];
   }
 }
