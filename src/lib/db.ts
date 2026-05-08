@@ -1,4 +1,4 @@
-
+//src/lib/db.ts
 import mysql from 'mysql2/promise';
 
 /**
@@ -25,7 +25,7 @@ const getSSLConfig = () => {
     rejectUnauthorized: false, 
   };
 };
-
+ 
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
