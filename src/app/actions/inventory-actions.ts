@@ -1,9 +1,9 @@
-
+//src/app/actions/inventory-actions.ts
 'use server';
 
 import pool from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
-import { InventoryItem } from '@/app/lib/types';
+import { InventoryItem } from '@/app/lib/types'; 
 import { revalidatePath } from 'next/cache';
 
 export async function getInventoryItems(): Promise<InventoryItem[]> {

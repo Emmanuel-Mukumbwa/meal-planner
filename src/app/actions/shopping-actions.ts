@@ -1,13 +1,14 @@
+//src/app/actions/shopping-actions.ts
 'use server';
 
 import pool from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 import { ShoppingListItem } from '@/app/lib/types';
 
-export async function getShoppingList(): Promise<ShoppingListItem[]> {
+export async function getShoppingList(): Promise<ShoppingListItem[]> { 
   const [rows] = await pool.execute('SELECT * FROM shopping_list ORDER BY createdAt DESC');
   return rows as ShoppingListItem[];
-}
+} 
 
 export async function addShoppingItem(item: Omit<ShoppingListItem, 'id'>) {
   const id = uuidv4();
