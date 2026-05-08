@@ -1,14 +1,3 @@
-'use server';
-/**
- * @fileOverview This file defines a Genkit flow for importing recipe details from a given URL.
- * It fetches the HTML content of the URL and then uses an AI model to extract
- * the recipe's title, ingredients, and cooking steps into a structured format.
- *
- * - importRecipeFromURL - A function that initiates the recipe import process.
- * - ImportRecipeFromURLInput - The input type for the importRecipeFromURL function.
- * - ImportRecipeFromURLOutput - The return type for the importRecipeFromURL function.
- */
-
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 
@@ -33,7 +22,6 @@ const ImportRecipeFromURLOutputSchema = z.object({
 });
 export type ImportRecipeFromURLOutput = z.infer<typeof ImportRecipeFromURLOutputSchema>;
 
-// Define a schema for the actual input to the prompt, which will be the HTML content
 const PromptInputSchema = z.object({
   htmlContent: z.string().describe('The HTML content of the recipe webpage.'),
 });
@@ -43,12 +31,12 @@ const recipeImportPrompt = ai.definePrompt({
   input: { schema: PromptInputSchema },
   output: { schema: ImportRecipeFromURLOutputSchema },
   prompt: `You are an expert recipe extractor. Your task is to extract recipe information from the provided HTML content.
-  Focus on identifying the recipe's title, a clear list of ingredients (each including quantity and unit if available, as a single descriptive string), and a sequential list of cooking steps.
-  Also try to extract optional information like preparation time, cooking time, and servings.
-  If a piece of information cannot be found, omit it from the output or leave the field empty if it's an array.
+Focus on identifying the recipe's title, a clear list of ingredients (each including quantity and unit if available, as a single descriptive string), and a sequential list of cooking steps.
+Also try to extract optional information like preparation time, cooking time, and servings.
+If a piece of information cannot be found, omit it from the output or leave the field empty if it's an array.
 
-  HTML Content:
-  {{{htmlContent}}}`,
+HTML Content:
+{{{htmlContent}}}`,
 });
 
 const importRecipeFromURLFlow = ai.defineFlow(
@@ -59,6 +47,7 @@ const importRecipeFromURLFlow = ai.defineFlow(
   },
   async (input) => {
     let htmlContent: string;
+
     try {
       const response = await fetch(input.url);
       if (!response.ok) {
