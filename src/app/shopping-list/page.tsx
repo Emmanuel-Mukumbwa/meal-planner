@@ -1,4 +1,4 @@
-
+//src/app/shopping-list/page.tsx
 "use client"
 
 import * as React from "react"
@@ -14,7 +14,7 @@ import { Plus, ShoppingCart, Trash2, Loader2, PackageCheck } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
 export default function ShoppingListPage() {
-  const { toast } = useToast()
+  const { toast } = useToast() 
   const [items, setItems] = React.useState<ShoppingListItem[]>([])
   const [loading, setLoading] = React.useState(true)
   const [newItemName, setNewItemName] = React.useState("")
