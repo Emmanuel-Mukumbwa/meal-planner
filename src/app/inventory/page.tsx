@@ -19,13 +19,15 @@ import {
   MoreVertical, 
   CircleAlert,
   Loader2,
-  Banknote
+  Banknote,
+  Edit
 } from "lucide-react"
 import { 
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu"
 import { 
   Dialog, 
@@ -38,30 +40,62 @@ import {
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { format, isPast, isWithinInterval, addDays } from "date-fns"
-import { getInventoryItems, addInventoryItem, deleteInventoryItem } from "@/app/actions/inventory-actions"
+import { getInventoryItems, addInventoryItem, updateInventoryItem, deleteInventoryItem } from "@/app/actions/inventory-actions"
 import { InventoryItem } from "@/app/lib/types"
 import { useToast } from "@/hooks/use-toast"
+
+// Common units for dropdown
+const commonUnits = [
+  { value: "litres", label: "Litres (L)" },
+  { value: "millilitres", label: "Millilitres (ml)" },
+  { value: "kg", label: "Kilograms (kg)" },
+  { value: "g", label: "Grams (g)" },
+  { value: "packets", label: "Packets" },
+  { value: "pieces", label: "Pieces" },
+  { value: "cartons", label: "Cartons" },
+  { value: "bottles", label: "Bottles" },
+  { value: "cans", label: "Cans" },
+  { value: "other", label: "Other (custom)" },
+]
 
 export default function InventoryPage() {
   const { toast } = useToast()
   const [items, setItems] = React.useState<InventoryItem[]>([])
   const [loading, setLoading] = React.useState(true)
   const [search, setSearch] = React.useState("")
-  const [isDialogOpen, setIsDialogOpen] = React.useState(false)
+  const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false)
+  const [editingItem, setEditingItem] = React.useState<InventoryItem | null>(null)
 
   // New Item State
   const [newItem, setNewItem] = React.useState({
     name: "",
     quantity: 1,
-    unit: "pcs",
+    unit: "litres",
     category: "Pantry",
     expiryDate: "",
     lowStockThreshold: 1,
-    unitPrice: 0,        // ← now storing unit price
+    unitPrice: 0,
+    customUnit: "",
   })
 
-  // Computed total value
+  // Edit Item State
+  const [editItem, setEditItem] = React.useState({
+    name: "",
+    quantity: 1,
+    unit: "",
+    category: "",
+    expiryDate: "",
+    lowStockThreshold: 1,
+    unitPrice: 0,
+    customUnit: "",
+  })
+
   const totalPrice = newItem.quantity * newItem.unitPrice
+  const displayUnit = newItem.unit === "other" ? newItem.customUnit : newItem.unit
+
+  const editTotalPrice = editItem.quantity * editItem.unitPrice
+  const editDisplayUnit = editItem.unit === "other" ? editItem.customUnit : editItem.unit
 
   React.useEffect(() => {
     loadItems()
@@ -82,22 +116,62 @@ export default function InventoryPage() {
 
   const handleAdd = async () => {
     if (!newItem.name) return
+    if (newItem.unit === "other" && !newItem.customUnit.trim()) {
+      toast({ title: "Unit required", description: "Please enter a custom unit.", variant: "destructive" })
+      return
+    }
+    const finalUnit = newItem.unit === "other" ? newItem.customUnit.trim() : newItem.unit
     try {
       const added = await addInventoryItem({
         name: newItem.name,
         quantity: newItem.quantity,
-        unit: newItem.unit,
+        unit: finalUnit,
         category: newItem.category,
         expiryDate: newItem.expiryDate || undefined,
         lowStockThreshold: newItem.lowStockThreshold,
-        price: totalPrice,  // ← send computed total
+        price: totalPrice,
       })
       setItems([added as InventoryItem, ...items])
-      setIsDialogOpen(false)
-      setNewItem({ name: "", quantity: 1, unit: "pcs", category: "Pantry", expiryDate: "", lowStockThreshold: 1, unitPrice: 0 })
-      toast({ title: "Item Added", description: `${newItem.name} (${newItem.quantity} × MK${newItem.unitPrice}) saved.` })
+      setIsAddDialogOpen(false)
+      setNewItem({ 
+        name: "", 
+        quantity: 1, 
+        unit: "litres", 
+        category: "Pantry", 
+        expiryDate: "", 
+        lowStockThreshold: 1, 
+        unitPrice: 0,
+        customUnit: ""
+      })
+      toast({ title: "Item Added", description: `${newItem.name} (${newItem.quantity} × MK${newItem.unitPrice} per ${finalUnit}) saved.` })
     } catch (error) {
       toast({ variant: "destructive", title: "Error", description: "Failed to add item." })
+    }
+  }
+
+  const handleEdit = async () => {
+    if (!editingItem) return
+    if (editItem.unit === "other" && !editItem.customUnit.trim()) {
+      toast({ title: "Unit required", description: "Please enter a custom unit.", variant: "destructive" })
+      return
+    }
+    const finalUnit = editItem.unit === "other" ? editItem.customUnit.trim() : editItem.unit
+    try {
+      await updateInventoryItem(editingItem.id, {
+        name: editItem.name,
+        quantity: editItem.quantity,
+        unit: finalUnit,
+        category: editItem.category,
+        expiryDate: editItem.expiryDate || null,
+        lowStockThreshold: editItem.lowStockThreshold,
+        price: editTotalPrice,
+      })
+      await loadItems() // refresh list
+      setIsEditDialogOpen(false)
+      setEditingItem(null)
+      toast({ title: "Item Updated", description: `${editItem.name} has been updated.` })
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error", description: "Failed to update item." })
     }
   }
 
@@ -111,6 +185,24 @@ export default function InventoryPage() {
     }
   }
 
+  const openEditDialog = (item: InventoryItem) => {
+    const unitPrice = item.quantity > 0 ? item.price / item.quantity : 0
+    // Check if unit is in common list, else set to "other"
+    const isKnownUnit = commonUnits.some(u => u.value === item.unit)
+    setEditingItem(item)
+    setEditItem({
+      name: item.name,
+      quantity: item.quantity,
+      unit: isKnownUnit ? item.unit : "other",
+      category: item.category,
+      expiryDate: item.expiryDate || "",
+      lowStockThreshold: item.lowStockThreshold,
+      unitPrice: unitPrice,
+      customUnit: isKnownUnit ? "" : item.unit,
+    })
+    setIsEditDialogOpen(true)
+  }
+
   const filteredItems = items.filter(item => 
     item.name.toLowerCase().includes(search.toLowerCase()) ||
     item.category.toLowerCase().includes(search.toLowerCase())
@@ -118,8 +210,8 @@ export default function InventoryPage() {
 
   const getStatusColor = (expiryDate?: string, quantity: number, threshold: number) => {
     if (!expiryDate) {
-       if (quantity <= threshold) return 'bg-destructive/10 text-destructive border-destructive'
-       return 'bg-secondary text-secondary-foreground border-border'
+      if (quantity <= threshold) return 'bg-destructive/10 text-destructive border-destructive'
+      return 'bg-secondary text-secondary-foreground border-border'
     }
 
     const date = new Date(expiryDate)
@@ -150,7 +242,7 @@ export default function InventoryPage() {
             <p className="text-muted-foreground">Track your pantry stock and values in Malawi Kwacha.</p>
           </div>
           
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
               <Button className="w-full md:w-auto bg-primary">
                 <Plus className="mr-2 h-4 w-4" /> Add New Item
@@ -159,13 +251,14 @@ export default function InventoryPage() {
             <DialogContent className="sm:max-w-[425px]">
               <DialogHeader>
                 <DialogTitle>Add Inventory Item</DialogTitle>
-                <DialogDescription>Enter the item details – the total value is calculated automatically.</DialogDescription>
+                <DialogDescription>Enter the item details. Use decimal quantities for partial units (e.g., 0.5 litres).</DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
                   <label className="text-sm font-medium">Name</label>
-                  <Input placeholder="e.g., Rice, Milk, Chicken" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} />
+                  <Input placeholder="e.g., Cooking Oil, Milk, Potatoes" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} />
                 </div>
+                
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
                     <label className="text-sm font-medium">Quantity</label>
@@ -173,13 +266,32 @@ export default function InventoryPage() {
                   </div>
                   <div className="grid gap-2">
                     <label className="text-sm font-medium">Unit</label>
-                    <Input placeholder="kg, liters, pcs" value={newItem.unit} onChange={e => setNewItem({...newItem, unit: e.target.value})} />
+                    <Select value={newItem.unit} onValueChange={v => setNewItem({...newItem, unit: v, customUnit: v === "other" ? newItem.customUnit : ""})}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {commonUnits.map(unit => (
+                          <SelectItem key={unit.value} value={unit.value}>{unit.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {newItem.unit === "other" && (
+                      <Input 
+                        placeholder="e.g., bucket, tray, plate" 
+                        value={newItem.customUnit}
+                        onChange={e => setNewItem({...newItem, customUnit: e.target.value})}
+                        className="mt-2"
+                      />
+                    )}
                   </div>
                 </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
                     <label className="text-sm font-medium">Unit Price (MK)</label>
-                    <Input type="number" min="0" step="0.01" placeholder="e.g., 900" value={newItem.unitPrice} onChange={e => setNewItem({...newItem, unitPrice: parseFloat(e.target.value) || 0})} />
+                    <Input type="number" min="0" step="0.01" placeholder="per unit" value={newItem.unitPrice} onChange={e => setNewItem({...newItem, unitPrice: parseFloat(e.target.value) || 0})} />
+                    <p className="text-[10px] text-muted-foreground">Price per {displayUnit || "unit"}</p>
                   </div>
                   <div className="grid gap-2">
                     <label className="text-sm font-medium">Category</label>
@@ -198,16 +310,19 @@ export default function InventoryPage() {
                     </Select>
                   </div>
                 </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
                     <label className="text-sm font-medium">Low Stock Threshold</label>
-                    <Input type="number" min="0" step="1" value={newItem.lowStockThreshold} onChange={e => setNewItem({...newItem, lowStockThreshold: parseInt(e.target.value) || 0})} />
+                    <Input type="number" min="0" step="0.01" value={newItem.lowStockThreshold} onChange={e => setNewItem({...newItem, lowStockThreshold: parseFloat(e.target.value) || 0})} />
+                    <p className="text-[10px] text-muted-foreground">Alert when quantity ≤ this value (in {displayUnit})</p>
                   </div>
                   <div className="grid gap-2">
                     <label className="text-sm font-medium">Expiry Date (Optional)</label>
                     <Input type="date" value={newItem.expiryDate} onChange={e => setNewItem({...newItem, expiryDate: e.target.value})} />
                   </div>
                 </div>
+
                 <div className="rounded-lg bg-muted/30 p-3 text-center">
                   <span className="text-xs font-medium text-muted-foreground">Total Value: </span>
                   <span className="text-sm font-bold text-primary">
@@ -216,8 +331,8 @@ export default function InventoryPage() {
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="ghost" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-                <Button onClick={handleAdd} disabled={!newItem.name || newItem.unitPrice < 0}>Add to Pantry</Button>
+                <Button variant="ghost" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
+                <Button onClick={handleAdd} disabled={!newItem.name || newItem.unitPrice <= 0}>Add to Pantry</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -255,7 +370,6 @@ export default function InventoryPage() {
               </TableHeader>
               <TableBody>
                 {filteredItems.map((item) => {
-                  // Compute unit price for display (optional – you could show it as a tooltip)
                   const unitPrice = item.quantity > 0 ? (item.price / item.quantity) : 0
                   return (
                     <TableRow key={item.id} className="transition-colors hover:bg-muted/20">
@@ -263,7 +377,7 @@ export default function InventoryPage() {
                         {item.name}
                         {unitPrice > 0 && (
                           <span className="ml-2 text-xs text-muted-foreground">
-                            (MK{unitPrice.toFixed(2)}/unit)
+                            (MK{unitPrice.toFixed(2)}/{item.unit})
                           </span>
                         )}
                       </TableCell>
@@ -301,7 +415,13 @@ export default function InventoryPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(item.id)}>Delete</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openEditDialog(item)}>
+                              <Edit className="mr-2 h-4 w-4" /> Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(item.id)}>
+                              Delete
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -320,6 +440,97 @@ export default function InventoryPage() {
           )}
         </div>
       </div>
+
+      {/* Edit Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit Inventory Item</DialogTitle>
+            <DialogDescription>Update the item details. Adjust low stock threshold to avoid unwanted alerts.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Name</label>
+              <Input value={editItem.name} onChange={e => setEditItem({...editItem, name: e.target.value})} />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Quantity</label>
+                <Input type="number" min="0" step="0.01" value={editItem.quantity} onChange={e => setEditItem({...editItem, quantity: parseFloat(e.target.value) || 0})} />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Unit</label>
+                <Select value={editItem.unit} onValueChange={v => setEditItem({...editItem, unit: v, customUnit: v === "other" ? editItem.customUnit : ""})}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {commonUnits.map(unit => (
+                      <SelectItem key={unit.value} value={unit.value}>{unit.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {editItem.unit === "other" && (
+                  <Input 
+                    placeholder="e.g., bucket, tray, plate" 
+                    value={editItem.customUnit}
+                    onChange={e => setEditItem({...editItem, customUnit: e.target.value})}
+                    className="mt-2"
+                  />
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Unit Price (MK)</label>
+                <Input type="number" min="0" step="0.01" value={editItem.unitPrice} onChange={e => setEditItem({...editItem, unitPrice: parseFloat(e.target.value) || 0})} />
+                <p className="text-[10px] text-muted-foreground">Price per {editDisplayUnit || "unit"}</p>
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Category</label>
+                <Select value={editItem.category} onValueChange={v => setEditItem({...editItem, category: v})}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Dairy">Dairy</SelectItem>
+                    <SelectItem value="Vegetables">Vegetables</SelectItem>
+                    <SelectItem value="Meat">Meat</SelectItem>
+                    <SelectItem value="Pantry">Pantry</SelectItem>
+                    <SelectItem value="Fruits">Fruits</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Low Stock Threshold</label>
+                <Input type="number" min="0" step="0.01" value={editItem.lowStockThreshold} onChange={e => setEditItem({...editItem, lowStockThreshold: parseFloat(e.target.value) || 0})} />
+                <p className="text-[10px] text-muted-foreground">Alert when quantity ≤ this value (in {editDisplayUnit})</p>
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Expiry Date (Optional)</label>
+                <Input type="date" value={editItem.expiryDate} onChange={e => setEditItem({...editItem, expiryDate: e.target.value})} />
+              </div>
+            </div>
+
+            <div className="rounded-lg bg-muted/30 p-3 text-center">
+              <span className="text-xs font-medium text-muted-foreground">Total Value: </span>
+              <span className="text-sm font-bold text-primary">
+                {new Intl.NumberFormat('en-MW', { style: 'currency', currency: 'MWK' }).format(editTotalPrice)}
+              </span>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleEdit} disabled={editItem.unitPrice <= 0}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   )
 }
