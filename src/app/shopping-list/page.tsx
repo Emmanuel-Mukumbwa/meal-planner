@@ -2,19 +2,21 @@
 
 import * as React from "react"
 import { AppLayout } from "@/components/layout/app-layout"
-import { getShoppingList, addShoppingItem, updateShoppingItem, deleteShoppingItem } from "@/app/actions/shopping-actions"
+import { getShoppingList, addShoppingItem, updateShoppingItem, deleteShoppingItem, addShoppingItemsIfMissing } from "@/app/actions/shopping-actions"
+import { getLowStockItems } from "@/app/actions/inventory-actions"
 import { ShoppingListItem } from "@/app/lib/types"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
-import { Plus, ShoppingCart, Trash2, Loader2, PackageCheck } from "lucide-react"
+import { Plus, ShoppingCart, Trash2, Loader2, PackageCheck, RefreshCw } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
 export default function ShoppingListPage() {
   const { toast } = useToast()
   const [items, setItems] = React.useState<ShoppingListItem[]>([])
   const [loading, setLoading] = React.useState(true)
+  const [autoFillLoading, setAutoFillLoading] = React.useState(false)
   const [newItemName, setNewItemName] = React.useState("")
 
   React.useEffect(() => {
@@ -68,6 +70,41 @@ export default function ShoppingListPage() {
     }
   }
 
+  const handleAutoFill = async () => {
+    setAutoFillLoading(true)
+    try {
+      const lowStockItems = await getLowStockItems()
+      if (lowStockItems.length === 0) {
+        toast({ title: "Nothing to restock", description: "No items are currently low in stock." })
+        return
+      }
+
+      const itemsToAdd = lowStockItems.map(item => ({
+        name: item.name,
+        quantity: 1,
+        unit: item.unit,
+        category: item.category
+      }))
+
+      const result = await addShoppingItemsIfMissing(itemsToAdd)
+      if (result.addedCount > 0) {
+        // Refresh the shopping list
+        await loadList()
+        toast({
+          title: "Shopping list updated",
+          description: `Added ${result.addedCount} low‑stock item${result.addedCount === 1 ? '' : 's'}: ${result.addedItems.join(', ')}`
+        })
+      } else {
+        toast({ title: "Already on list", description: "All low‑stock items are already in your shopping list." })
+      }
+    } catch (error) {
+      console.error(error)
+      toast({ variant: "destructive", title: "Error", description: "Failed to auto‑fill shopping list." })
+    } finally {
+      setAutoFillLoading(false)
+    }
+  }
+
   return (
     <AppLayout>
       <div className="flex flex-col gap-6">
@@ -80,67 +117,82 @@ export default function ShoppingListPage() {
 
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2 space-y-4">
-             <Card className="border-none shadow-sm">
-                <CardContent className="p-4 flex gap-2">
-                  <Input
-                    placeholder="Add an item... e.g., Milk, Eggs, Bread"
-                    value={newItemName}
-                    onChange={(e) => setNewItemName(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddItem()}
-                  />
-                  <Button onClick={handleAddItem} size="icon" className="bg-primary">
-                    <Plus className="h-5 w-5" />
-                  </Button>
-                </CardContent>
-             </Card>
+            <Card className="border-none shadow-sm">
+              <CardContent className="p-4 flex gap-2">
+                <Input
+                  placeholder="Add an item... e.g., Milk, Eggs, Bread"
+                  value={newItemName}
+                  onChange={(e) => setNewItemName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddItem()}
+                />
+                <Button onClick={handleAddItem} size="icon" className="bg-primary">
+                  <Plus className="h-5 w-5" />
+                </Button>
+              </CardContent>
+            </Card>
 
-             {loading ? (
-               <div className="flex justify-center p-10"><Loader2 className="h-8 w-8 animate-spin" /></div>
-             ) : (
-               <Card className="border-none shadow-sm overflow-hidden">
-                 <CardContent className="p-0 divide-y">
-                   {items.map((item) => (
-                     <div key={item.id} className="flex items-center justify-between p-4 hover:bg-muted/5">
-                       <div className="flex items-center gap-4">
-                         <Checkbox
-                           checked={!!item.completed}
-                           onCheckedChange={() => handleToggle(item.id, !!item.completed)}
-                         />
-                         <div>
-                           <span className={item.completed ? "line-through text-muted-foreground" : "font-medium"}>
-                             {item.name}
-                           </span>
-                           <p className="text-xs text-muted-foreground">
-                             {item.quantity} {item.unit}
-                             {item.completed && <span className="ml-2 text-primary">✓ Purchased</span>}
-                           </p>
-                         </div>
-                       </div>
-                       <Button variant="ghost" size="icon" onClick={() => handleDelete(item.id)}>
-                         <Trash2 className="h-4 w-4 text-destructive" />
-                       </Button>
-                     </div>
-                   ))}
-                   {items.length === 0 && (
-                      <div className="p-10 text-center space-y-2">
-                         <PackageCheck className="h-10 w-10 mx-auto text-accent" />
-                         <p className="text-muted-foreground">Your shopping list is empty.</p>
-                         <p className="text-xs text-muted-foreground">Add items above to get started.</p>
+            {loading ? (
+              <div className="flex justify-center p-10"><Loader2 className="h-8 w-8 animate-spin" /></div>
+            ) : (
+              <Card className="border-none shadow-sm overflow-hidden">
+                <CardContent className="p-0 divide-y">
+                  {items.map((item) => (
+                    <div key={item.id} className="flex items-center justify-between p-4 hover:bg-muted/5">
+                      <div className="flex items-center gap-4">
+                        <Checkbox
+                          checked={!!item.completed}
+                          onCheckedChange={() => handleToggle(item.id, !!item.completed)}
+                        />
+                        <div>
+                          <span className={item.completed ? "line-through text-muted-foreground" : "font-medium"}>
+                            {item.name}
+                          </span>
+                          <p className="text-xs text-muted-foreground">
+                            {item.quantity} {item.unit}
+                            {item.completed && <span className="ml-2 text-primary">✓ Purchased</span>}
+                          </p>
+                        </div>
                       </div>
-                   )}
-                 </CardContent>
-               </Card>
-             )}
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(item.id)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  ))}
+                  {items.length === 0 && (
+                    <div className="p-10 text-center space-y-2">
+                      <PackageCheck className="h-10 w-10 mx-auto text-accent" />
+                      <p className="text-muted-foreground">Your shopping list is empty.</p>
+                      <p className="text-xs text-muted-foreground">Add items above or click the auto‑fill button to restock low‑inventory items.</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </div>
 
-          {/* Optional tip card (can be removed if not needed) */}
-          <div className="hidden lg:block">
+          {/* Auto‑fill card */}
+          <div>
             <Card className="border-none shadow-sm bg-accent/5">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-headline">Smart Tip</CardTitle>
+                <CardTitle className="text-sm font-headline">Restock from Inventory</CardTitle>
               </CardHeader>
-              <CardContent className="text-xs text-muted-foreground">
-                You can auto‑fill this list from inventory items that are low in stock. That feature is coming soon!
+              <CardContent className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Automatically add items that are running low in your pantry.
+                </p>
+                <Button
+                  variant="outline"
+                  className="w-full gap-2"
+                  onClick={handleAutoFill}
+                  disabled={autoFillLoading}
+                >
+                  {autoFillLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                  {autoFillLoading ? "Checking..." : "Auto‑fill from low stock"}
+                </Button>
               </CardContent>
             </Card>
           </div>
