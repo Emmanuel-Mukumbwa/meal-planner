@@ -1,4 +1,3 @@
-
 "use client"
 
 import * as React from "react"
@@ -9,7 +8,7 @@ import {
   TableCell, 
   TableHead, 
   TableHeader, 
-  TableRow 
+  TableRow  
 } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -58,8 +57,11 @@ export default function InventoryPage() {
     category: "Pantry",
     expiryDate: "",
     lowStockThreshold: 1,
-    price: 0
+    unitPrice: 0,        // ← now storing unit price
   })
+
+  // Computed total value
+  const totalPrice = newItem.quantity * newItem.unitPrice
 
   React.useEffect(() => {
     loadItems()
@@ -72,7 +74,7 @@ export default function InventoryPage() {
       setItems(data)
     } catch (error) {
       console.error("Failed to load items:", error)
-      toast({ variant: "destructive", title: "Connection Error", description: "Could not fetch inventory from database." })
+      toast({ variant: "destructive", title: "Connection Error", description: "Could not fetch inventory." })
     } finally {
       setLoading(false)
     }
@@ -82,18 +84,20 @@ export default function InventoryPage() {
     if (!newItem.name) return
     try {
       const added = await addInventoryItem({
-        ...newItem,
-        quantity: Number(newItem.quantity),
-        lowStockThreshold: Number(newItem.lowStockThreshold),
-        price: Number(newItem.price),
-        expiryDate: newItem.expiryDate || undefined
+        name: newItem.name,
+        quantity: newItem.quantity,
+        unit: newItem.unit,
+        category: newItem.category,
+        expiryDate: newItem.expiryDate || undefined,
+        lowStockThreshold: newItem.lowStockThreshold,
+        price: totalPrice,  // ← send computed total
       })
       setItems([added as InventoryItem, ...items])
       setIsDialogOpen(false)
-      setNewItem({ name: "", quantity: 1, unit: "pcs", category: "Pantry", expiryDate: "", lowStockThreshold: 1, price: 0 })
-      toast({ title: "Item Added", description: `${newItem.name} saved successfully.` })
+      setNewItem({ name: "", quantity: 1, unit: "pcs", category: "Pantry", expiryDate: "", lowStockThreshold: 1, unitPrice: 0 })
+      toast({ title: "Item Added", description: `${newItem.name} (${newItem.quantity} × MK${newItem.unitPrice}) saved.` })
     } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: "Failed to add item. Check your database settings." })
+      toast({ variant: "destructive", title: "Error", description: "Failed to add item." })
     }
   }
 
@@ -143,7 +147,7 @@ export default function InventoryPage() {
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-3xl font-bold font-headline tracking-tight">Inventory</h1>
-            <p className="text-muted-foreground">Manage your pantry stock and values in Malawi Kwacha.</p>
+            <p className="text-muted-foreground">Track your pantry stock and values in Malawi Kwacha.</p>
           </div>
           
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -155,7 +159,7 @@ export default function InventoryPage() {
             <DialogContent className="sm:max-w-[425px]">
               <DialogHeader>
                 <DialogTitle>Add Inventory Item</DialogTitle>
-                <DialogDescription>Store a new item in your Aiven MySQL database.</DialogDescription>
+                <DialogDescription>Enter the item details – the total value is calculated automatically.</DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
@@ -165,7 +169,7 @@ export default function InventoryPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
                     <label className="text-sm font-medium">Quantity</label>
-                    <Input type="number" value={newItem.quantity} onChange={e => setNewItem({...newItem, quantity: Number(e.target.value)})} />
+                    <Input type="number" min="0" step="0.01" value={newItem.quantity} onChange={e => setNewItem({...newItem, quantity: parseFloat(e.target.value) || 0})} />
                   </div>
                   <div className="grid gap-2">
                     <label className="text-sm font-medium">Unit</label>
@@ -174,8 +178,8 @@ export default function InventoryPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
-                    <label className="text-sm font-medium">Price (MK)</label>
-                    <Input type="number" placeholder="0.00" value={newItem.price} onChange={e => setNewItem({...newItem, price: Number(e.target.value)})} />
+                    <label className="text-sm font-medium">Unit Price (MK)</label>
+                    <Input type="number" min="0" step="0.01" placeholder="e.g., 900" value={newItem.unitPrice} onChange={e => setNewItem({...newItem, unitPrice: parseFloat(e.target.value) || 0})} />
                   </div>
                   <div className="grid gap-2">
                     <label className="text-sm font-medium">Category</label>
@@ -194,14 +198,26 @@ export default function InventoryPage() {
                     </Select>
                   </div>
                 </div>
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">Expiry Date (Optional)</label>
-                  <Input type="date" value={newItem.expiryDate} onChange={e => setNewItem({...newItem, expiryDate: e.target.value})} />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium">Low Stock Threshold</label>
+                    <Input type="number" min="0" step="1" value={newItem.lowStockThreshold} onChange={e => setNewItem({...newItem, lowStockThreshold: parseInt(e.target.value) || 0})} />
+                  </div>
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium">Expiry Date (Optional)</label>
+                    <Input type="date" value={newItem.expiryDate} onChange={e => setNewItem({...newItem, expiryDate: e.target.value})} />
+                  </div>
+                </div>
+                <div className="rounded-lg bg-muted/30 p-3 text-center">
+                  <span className="text-xs font-medium text-muted-foreground">Total Value: </span>
+                  <span className="text-sm font-bold text-primary">
+                    {new Intl.NumberFormat('en-MW', { style: 'currency', currency: 'MWK' }).format(totalPrice)}
+                  </span>
                 </div>
               </div>
               <DialogFooter>
                 <Button variant="ghost" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-                <Button onClick={handleAdd} disabled={!newItem.name}>Save to Database</Button>
+                <Button onClick={handleAdd} disabled={!newItem.name || newItem.unitPrice < 0}>Add to Pantry</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -223,7 +239,7 @@ export default function InventoryPage() {
           {loading ? (
             <div className="flex flex-col items-center justify-center h-64 gap-2">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Connecting to database...</p>
+              <p className="text-sm text-muted-foreground">Loading inventory...</p>
             </div>
           ) : (
             <Table>
@@ -232,55 +248,66 @@ export default function InventoryPage() {
                   <TableHead className="font-semibold">Item Name</TableHead>
                   <TableHead className="font-semibold">Category</TableHead>
                   <TableHead className="font-semibold">Stock Level</TableHead>
-                  <TableHead className="font-semibold">Price (MK)</TableHead>
+                  <TableHead className="font-semibold">Total Value (MK)</TableHead>
                   <TableHead className="font-semibold">Status</TableHead>
                   <TableHead className="text-right"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredItems.map((item) => (
-                  <TableRow key={item.id} className="transition-colors hover:bg-muted/20">
-                    <TableCell className="font-medium">{item.name}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="font-normal">
-                        {item.category}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span className={item.quantity <= item.lowStockThreshold ? "text-destructive font-bold" : ""}>
-                          {item.quantity} {item.unit}
-                        </span>
-                        {item.quantity <= item.lowStockThreshold && (
-                          <CircleAlert className="h-4 w-4 text-destructive" />
+                {filteredItems.map((item) => {
+                  // Compute unit price for display (optional – you could show it as a tooltip)
+                  const unitPrice = item.quantity > 0 ? (item.price / item.quantity) : 0
+                  return (
+                    <TableRow key={item.id} className="transition-colors hover:bg-muted/20">
+                      <TableCell className="font-medium">
+                        {item.name}
+                        {unitPrice > 0 && (
+                          <span className="ml-2 text-xs text-muted-foreground">
+                            (MK{unitPrice.toFixed(2)}/unit)
+                          </span>
                         )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1 text-sm font-medium">
-                        <Banknote className="h-3 w-3 text-primary" />
-                        {new Intl.NumberFormat('en-MW', { style: 'currency', currency: 'MWK' }).format(item.price || 0)}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getStatusColor(item.expiryDate, item.quantity, item.lowStockThreshold)}>
-                        {getStatusLabel(item.expiryDate, item.quantity, item.lowStockThreshold)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(item.id)}>Delete</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className="font-normal">
+                          {item.category}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <span className={item.quantity <= item.lowStockThreshold ? "text-destructive font-bold" : ""}>
+                            {item.quantity} {item.unit}
+                          </span>
+                          {item.quantity <= item.lowStockThreshold && (
+                            <CircleAlert className="h-4 w-4 text-destructive" />
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1 text-sm font-medium">
+                          <Banknote className="h-3 w-3 text-primary" />
+                          {new Intl.NumberFormat('en-MW', { style: 'currency', currency: 'MWK' }).format(item.price || 0)}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getStatusColor(item.expiryDate, item.quantity, item.lowStockThreshold)}>
+                          {getStatusLabel(item.expiryDate, item.quantity, item.lowStockThreshold)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(item.id)}>Delete</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
                 {filteredItems.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">

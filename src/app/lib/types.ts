@@ -1,4 +1,4 @@
-
+//src/app/lib/types.ts
 export type InventoryItem = {
   id: string;
   name: string;
@@ -12,7 +12,7 @@ export type InventoryItem = {
 
 export type Recipe = {
   id: string;
-  name: string;
+  name: string; 
   description?: string;
   ingredients: {
     name: string;
