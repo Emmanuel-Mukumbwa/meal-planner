@@ -76,6 +76,7 @@ export default function InventoryPage() {
     expiryDate: "",
     lowStockThreshold: 1,
     unitPrice: 0,
+    totalPrice: 0,        // added for user convenience
     customUnit: "",
   })
 
@@ -88,14 +89,75 @@ export default function InventoryPage() {
     expiryDate: "",
     lowStockThreshold: 1,
     unitPrice: 0,
+    totalPrice: 0,
     customUnit: "",
   })
 
-  const totalPrice = newItem.quantity * newItem.unitPrice
   const displayUnit = newItem.unit === "other" ? newItem.customUnit : newItem.unit
-
-  const editTotalPrice = editItem.quantity * editItem.unitPrice
   const editDisplayUnit = editItem.unit === "other" ? editItem.customUnit : editItem.unit
+
+  // Synchronize unitPrice <-> totalPrice based on quantity
+  const updateUnitPriceFromTotal = (total: number, quantity: number, setter: (value: number) => void) => {
+    if (quantity > 0) {
+      setter(total / quantity)
+    } else {
+      setter(0)
+    }
+  }
+
+  const updateTotalFromUnitPrice = (unit: number, quantity: number, setter: (value: number) => void) => {
+    setter(unit * quantity)
+  }
+
+  // Handlers for new item fields
+  const handleNewUnitPriceChange = (value: number) => {
+    setNewItem(prev => {
+      const unitPrice = value
+      const totalPrice = unitPrice * prev.quantity
+      return { ...prev, unitPrice, totalPrice }
+    })
+  }
+
+  const handleNewTotalPriceChange = (value: number) => {
+    setNewItem(prev => {
+      const totalPrice = value
+      const unitPrice = prev.quantity > 0 ? totalPrice / prev.quantity : 0
+      return { ...prev, unitPrice, totalPrice }
+    })
+  }
+
+  const handleNewQuantityChange = (quantity: number) => {
+    setNewItem(prev => {
+      const newUnitPrice = prev.unitPrice
+      const newTotalPrice = newUnitPrice * quantity
+      return { ...prev, quantity, totalPrice: newTotalPrice }
+    })
+  }
+
+  // Handlers for edit item fields
+  const handleEditUnitPriceChange = (value: number) => {
+    setEditItem(prev => {
+      const unitPrice = value
+      const totalPrice = unitPrice * prev.quantity
+      return { ...prev, unitPrice, totalPrice }
+    })
+  }
+
+  const handleEditTotalPriceChange = (value: number) => {
+    setEditItem(prev => {
+      const totalPrice = value
+      const unitPrice = prev.quantity > 0 ? totalPrice / prev.quantity : 0
+      return { ...prev, unitPrice, totalPrice }
+    })
+  }
+
+  const handleEditQuantityChange = (quantity: number) => {
+    setEditItem(prev => {
+      const newUnitPrice = prev.unitPrice
+      const newTotalPrice = newUnitPrice * quantity
+      return { ...prev, quantity, totalPrice: newTotalPrice }
+    })
+  }
 
   React.useEffect(() => {
     loadItems()
@@ -129,7 +191,7 @@ export default function InventoryPage() {
         category: newItem.category,
         expiryDate: newItem.expiryDate || undefined,
         lowStockThreshold: newItem.lowStockThreshold,
-        price: totalPrice,
+        price: newItem.totalPrice,  // use total price from state
       })
       setItems([added as InventoryItem, ...items])
       setIsAddDialogOpen(false)
@@ -141,9 +203,10 @@ export default function InventoryPage() {
         expiryDate: "", 
         lowStockThreshold: 1, 
         unitPrice: 0,
+        totalPrice: 0,
         customUnit: ""
       })
-      toast({ title: "Item Added", description: `${newItem.name} (${newItem.quantity} × MK${newItem.unitPrice} per ${finalUnit}) saved.` })
+      toast({ title: "Item Added", description: `${newItem.name} (${newItem.quantity} × MK${newItem.unitPrice.toFixed(2)} per ${finalUnit}) saved.` })
     } catch (error) {
       toast({ variant: "destructive", title: "Error", description: "Failed to add item." })
     }
@@ -164,9 +227,9 @@ export default function InventoryPage() {
         category: editItem.category,
         expiryDate: editItem.expiryDate || null,
         lowStockThreshold: editItem.lowStockThreshold,
-        price: editTotalPrice,
+        price: editItem.totalPrice,
       })
-      await loadItems() // refresh list
+      await loadItems()
       setIsEditDialogOpen(false)
       setEditingItem(null)
       toast({ title: "Item Updated", description: `${editItem.name} has been updated.` })
@@ -187,7 +250,6 @@ export default function InventoryPage() {
 
   const openEditDialog = (item: InventoryItem) => {
     const unitPrice = item.quantity > 0 ? item.price / item.quantity : 0
-    // Check if unit is in common list, else set to "other"
     const isKnownUnit = commonUnits.some(u => u.value === item.unit)
     setEditingItem(item)
     setEditItem({
@@ -198,6 +260,7 @@ export default function InventoryPage() {
       expiryDate: item.expiryDate || "",
       lowStockThreshold: item.lowStockThreshold,
       unitPrice: unitPrice,
+      totalPrice: item.price,
       customUnit: isKnownUnit ? "" : item.unit,
     })
     setIsEditDialogOpen(true)
@@ -235,11 +298,11 @@ export default function InventoryPage() {
 
   return (
     <AppLayout>
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-4 md:gap-6">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-3xl font-bold font-headline tracking-tight">Inventory</h1>
-            <p className="text-muted-foreground">Track your pantry stock and values in Malawi Kwacha.</p>
+            <h1 className="text-2xl md:text-3xl font-bold font-headline tracking-tight">Inventory</h1>
+            <p className="text-sm text-muted-foreground">Track your pantry stock and values in Malawi Kwacha.</p>
           </div>
           
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
@@ -248,23 +311,23 @@ export default function InventoryPage() {
                 <Plus className="mr-2 h-4 w-4" /> Add New Item
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="w-[95vw] max-w-[95vw] sm:max-w-[425px] rounded-lg p-4">
               <DialogHeader>
                 <DialogTitle>Add Inventory Item</DialogTitle>
                 <DialogDescription>Enter the item details. Use decimal quantities for partial units (e.g., 0.5 litres).</DialogDescription>
               </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
+              <div className="grid gap-3 py-3">
+                <div className="grid gap-1.5">
                   <label className="text-sm font-medium">Name</label>
                   <Input placeholder="e.g., Cooking Oil, Milk, Potatoes" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} />
                 </div>
                 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="grid gap-1.5">
                     <label className="text-sm font-medium">Quantity</label>
-                    <Input type="number" min="0" step="0.01" value={newItem.quantity} onChange={e => setNewItem({...newItem, quantity: parseFloat(e.target.value) || 0})} />
+                    <Input type="number" min="0" step="0.01" value={newItem.quantity} onChange={e => handleNewQuantityChange(parseFloat(e.target.value) || 0)} />
                   </div>
-                  <div className="grid gap-2">
+                  <div className="grid gap-1.5">
                     <label className="text-sm font-medium">Unit</label>
                     <Select value={newItem.unit} onValueChange={v => setNewItem({...newItem, unit: v, customUnit: v === "other" ? newItem.customUnit : ""})}>
                       <SelectTrigger>
@@ -281,19 +344,27 @@ export default function InventoryPage() {
                         placeholder="e.g., bucket, tray, plate" 
                         value={newItem.customUnit}
                         onChange={e => setNewItem({...newItem, customUnit: e.target.value})}
-                        className="mt-2"
+                        className="mt-1"
                       />
                     )}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="grid gap-1.5">
                     <label className="text-sm font-medium">Unit Price (MK)</label>
-                    <Input type="number" min="0" step="0.01" placeholder="per unit" value={newItem.unitPrice} onChange={e => setNewItem({...newItem, unitPrice: parseFloat(e.target.value) || 0})} />
+                    <Input type="number" min="0" step="0.01" placeholder="per unit" value={newItem.unitPrice} onChange={e => handleNewUnitPriceChange(parseFloat(e.target.value) || 0)} />
                     <p className="text-[10px] text-muted-foreground">Price per {displayUnit || "unit"}</p>
                   </div>
-                  <div className="grid gap-2">
+                  <div className="grid gap-1.5">
+                    <label className="text-sm font-medium">Total Price (MK)</label>
+                    <Input type="number" min="0" step="0.01" placeholder="e.g., 13000" value={newItem.totalPrice} onChange={e => handleNewTotalPriceChange(parseFloat(e.target.value) || 0)} />
+                    <p className="text-[10px] text-muted-foreground">Total value for {newItem.quantity} {displayUnit}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="grid gap-1.5">
                     <label className="text-sm font-medium">Category</label>
                     <Select value={newItem.category} onValueChange={v => setNewItem({...newItem, category: v})}>
                       <SelectTrigger>
@@ -309,36 +380,34 @@ export default function InventoryPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
+                  <div className="grid gap-1.5">
                     <label className="text-sm font-medium">Low Stock Threshold</label>
                     <Input type="number" min="0" step="0.01" value={newItem.lowStockThreshold} onChange={e => setNewItem({...newItem, lowStockThreshold: parseFloat(e.target.value) || 0})} />
                     <p className="text-[10px] text-muted-foreground">Alert when quantity ≤ this value (in {displayUnit})</p>
                   </div>
-                  <div className="grid gap-2">
-                    <label className="text-sm font-medium">Expiry Date (Optional)</label>
-                    <Input type="date" value={newItem.expiryDate} onChange={e => setNewItem({...newItem, expiryDate: e.target.value})} />
-                  </div>
                 </div>
 
-                <div className="rounded-lg bg-muted/30 p-3 text-center">
+                <div className="grid gap-1.5">
+                  <label className="text-sm font-medium">Expiry Date (Optional)</label>
+                  <Input type="date" value={newItem.expiryDate} onChange={e => setNewItem({...newItem, expiryDate: e.target.value})} />
+                </div>
+
+                <div className="rounded-lg bg-muted/30 p-2 text-center">
                   <span className="text-xs font-medium text-muted-foreground">Total Value: </span>
                   <span className="text-sm font-bold text-primary">
-                    {new Intl.NumberFormat('en-MW', { style: 'currency', currency: 'MWK' }).format(totalPrice)}
+                    {new Intl.NumberFormat('en-MW', { style: 'currency', currency: 'MWK' }).format(newItem.totalPrice)}
                   </span>
                 </div>
               </div>
-              <DialogFooter>
+              <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2">
                 <Button variant="ghost" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
-                <Button onClick={handleAdd} disabled={!newItem.name || newItem.unitPrice <= 0}>Add to Pantry</Button>
+                <Button onClick={handleAdd} disabled={!newItem.name || newItem.totalPrice <= 0}>Add to Pantry</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
 
-        <div className="flex flex-col gap-4 md:flex-row md:items-center">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input 
@@ -350,14 +419,15 @@ export default function InventoryPage() {
           </div>
         </div>
 
-        <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+        {/* Mobile-friendly table container with horizontal scroll */}
+        <div className="rounded-xl border bg-card shadow-sm overflow-x-auto">
           {loading ? (
             <div className="flex flex-col items-center justify-center h-64 gap-2">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
               <p className="text-sm text-muted-foreground">Loading inventory...</p>
             </div>
           ) : (
-            <Table>
+            <Table className="min-w-[640px] md:min-w-full">
               <TableHeader className="bg-muted/30">
                 <TableRow>
                   <TableHead className="font-semibold">Item Name</TableHead>
@@ -365,7 +435,7 @@ export default function InventoryPage() {
                   <TableHead className="font-semibold">Stock Level</TableHead>
                   <TableHead className="font-semibold">Total Value (MK)</TableHead>
                   <TableHead className="font-semibold">Status</TableHead>
-                  <TableHead className="text-right"></TableHead>
+                  <TableHead className="text-right w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -373,7 +443,7 @@ export default function InventoryPage() {
                   const unitPrice = item.quantity > 0 ? (item.price / item.quantity) : 0
                   return (
                     <TableRow key={item.id} className="transition-colors hover:bg-muted/20">
-                      <TableCell className="font-medium">
+                      <TableCell className="font-medium whitespace-nowrap">
                         {item.name}
                         {unitPrice > 0 && (
                           <span className="ml-2 text-xs text-muted-foreground">
@@ -382,28 +452,28 @@ export default function InventoryPage() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary" className="font-normal">
+                        <Badge variant="secondary" className="font-normal text-xs">
                           {item.category}
                         </Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <span className={item.quantity <= item.lowStockThreshold ? "text-destructive font-bold" : ""}>
                             {item.quantity} {item.unit}
                           </span>
                           {item.quantity <= item.lowStockThreshold && (
-                            <CircleAlert className="h-4 w-4 text-destructive" />
+                            <CircleAlert className="h-4 w-4 text-destructive shrink-0" />
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap">
                         <div className="flex items-center gap-1 text-sm font-medium">
-                          <Banknote className="h-3 w-3 text-primary" />
+                          <Banknote className="h-3 w-3 text-primary shrink-0" />
                           {new Intl.NumberFormat('en-MW', { style: 'currency', currency: 'MWK' }).format(item.price || 0)}
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge className={getStatusColor(item.expiryDate, item.quantity, item.lowStockThreshold)}>
+                        <Badge className={getStatusColor(item.expiryDate, item.quantity, item.lowStockThreshold) + " text-xs"}>
                           {getStatusLabel(item.expiryDate, item.quantity, item.lowStockThreshold)}
                         </Badge>
                       </TableCell>
@@ -443,23 +513,23 @@ export default function InventoryPage() {
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="w-[95vw] max-w-[95vw] sm:max-w-[425px] rounded-lg p-4">
           <DialogHeader>
             <DialogTitle>Edit Inventory Item</DialogTitle>
             <DialogDescription>Update the item details. Adjust low stock threshold to avoid unwanted alerts.</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
+          <div className="grid gap-3 py-3">
+            <div className="grid gap-1.5">
               <label className="text-sm font-medium">Name</label>
               <Input value={editItem.name} onChange={e => setEditItem({...editItem, name: e.target.value})} />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
                 <label className="text-sm font-medium">Quantity</label>
-                <Input type="number" min="0" step="0.01" value={editItem.quantity} onChange={e => setEditItem({...editItem, quantity: parseFloat(e.target.value) || 0})} />
+                <Input type="number" min="0" step="0.01" value={editItem.quantity} onChange={e => handleEditQuantityChange(parseFloat(e.target.value) || 0)} />
               </div>
-              <div className="grid gap-2">
+              <div className="grid gap-1.5">
                 <label className="text-sm font-medium">Unit</label>
                 <Select value={editItem.unit} onValueChange={v => setEditItem({...editItem, unit: v, customUnit: v === "other" ? editItem.customUnit : ""})}>
                   <SelectTrigger>
@@ -476,19 +546,27 @@ export default function InventoryPage() {
                     placeholder="e.g., bucket, tray, plate" 
                     value={editItem.customUnit}
                     onChange={e => setEditItem({...editItem, customUnit: e.target.value})}
-                    className="mt-2"
+                    className="mt-1"
                   />
                 )}
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
                 <label className="text-sm font-medium">Unit Price (MK)</label>
-                <Input type="number" min="0" step="0.01" value={editItem.unitPrice} onChange={e => setEditItem({...editItem, unitPrice: parseFloat(e.target.value) || 0})} />
+                <Input type="number" min="0" step="0.01" value={editItem.unitPrice} onChange={e => handleEditUnitPriceChange(parseFloat(e.target.value) || 0)} />
                 <p className="text-[10px] text-muted-foreground">Price per {editDisplayUnit || "unit"}</p>
               </div>
-              <div className="grid gap-2">
+              <div className="grid gap-1.5">
+                <label className="text-sm font-medium">Total Price (MK)</label>
+                <Input type="number" min="0" step="0.01" value={editItem.totalPrice} onChange={e => handleEditTotalPriceChange(parseFloat(e.target.value) || 0)} />
+                <p className="text-[10px] text-muted-foreground">Total value for {editItem.quantity} {editDisplayUnit}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
                 <label className="text-sm font-medium">Category</label>
                 <Select value={editItem.category} onValueChange={v => setEditItem({...editItem, category: v})}>
                   <SelectTrigger>
@@ -504,30 +582,28 @@ export default function InventoryPage() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
+              <div className="grid gap-1.5">
                 <label className="text-sm font-medium">Low Stock Threshold</label>
                 <Input type="number" min="0" step="0.01" value={editItem.lowStockThreshold} onChange={e => setEditItem({...editItem, lowStockThreshold: parseFloat(e.target.value) || 0})} />
                 <p className="text-[10px] text-muted-foreground">Alert when quantity ≤ this value (in {editDisplayUnit})</p>
               </div>
-              <div className="grid gap-2">
-                <label className="text-sm font-medium">Expiry Date (Optional)</label>
-                <Input type="date" value={editItem.expiryDate} onChange={e => setEditItem({...editItem, expiryDate: e.target.value})} />
-              </div>
             </div>
 
-            <div className="rounded-lg bg-muted/30 p-3 text-center">
+            <div className="grid gap-1.5">
+              <label className="text-sm font-medium">Expiry Date (Optional)</label>
+              <Input type="date" value={editItem.expiryDate} onChange={e => setEditItem({...editItem, expiryDate: e.target.value})} />
+            </div>
+
+            <div className="rounded-lg bg-muted/30 p-2 text-center">
               <span className="text-xs font-medium text-muted-foreground">Total Value: </span>
               <span className="text-sm font-bold text-primary">
-                {new Intl.NumberFormat('en-MW', { style: 'currency', currency: 'MWK' }).format(editTotalPrice)}
+                {new Intl.NumberFormat('en-MW', { style: 'currency', currency: 'MWK' }).format(editItem.totalPrice)}
               </span>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2">
             <Button variant="ghost" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleEdit} disabled={editItem.unitPrice <= 0}>Save Changes</Button>
+            <Button onClick={handleEdit} disabled={editItem.totalPrice <= 0}>Save Changes</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
