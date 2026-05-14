@@ -15,8 +15,9 @@ import {
   Loader2,
   Plus,
   X,
+  Lock,
 } from "lucide-react";
-import { format, addDays, startOfWeek } from "date-fns";
+import { format, addDays, startOfWeek, isAfter, isToday, isBefore } from "date-fns";
 import { getInventoryItems } from "@/app/actions/inventory-actions";
 import { getRecipes } from "@/app/actions/recipe-actions";
 import { suggestMealsFromInventory } from "@/app/actions/meal-actions";
@@ -28,9 +29,36 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+// Define end times for each meal slot (24-hour format)
+const SLOT_END_TIMES: Record<MealSlot, number> = {
+  breakfast: 9.75, // 9:45 AM = 9.75 hours
+  lunch: 13.5,     // 1:30 PM = 13.5 hours
+  dinner: 21.75,   // 9:45 PM = 21.75 hours
+  snack: 23.0,     // optional, for completeness
+};
+
+// Helper: Check if a given slot is still editable
+function isSlotEditable(date: Date, slot: MealSlot): boolean {
+  const now = new Date();
+  // If date is in the past, not editable
+  if (isBefore(date, now) && !isToday(date)) return false;
+  // If it's today, compare current time with slot end time
+  if (isToday(date)) {
+    const currentHour = now.getHours() + now.getMinutes() / 60;
+    return currentHour < SLOT_END_TIMES[slot];
+  }
+  // Future dates are always editable
+  return true;
+}
 
 export default function MealPlannerPage() {
   const { toast } = useToast();
@@ -49,7 +77,6 @@ export default function MealPlannerPage() {
 
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(selectedWeek, i));
 
-  // Load recipes and meal plans when week changes
   React.useEffect(() => {
     loadData();
   }, [selectedWeek]);
@@ -62,8 +89,6 @@ export default function MealPlannerPage() {
         getMealPlanForWeek(selectedWeek, addDays(selectedWeek, 6)),
       ]);
       setRecipes(recipesData);
-
-      // Transform into easy lookup: { "2025-05-15": { breakfast: "recipeId", lunch: "recipeId", ... } }
       const plansMap: Record<string, Record<MealSlot, string>> = {};
       mealPlanData.forEach((plan) => {
         const dateKey = plan.date;
@@ -79,6 +104,14 @@ export default function MealPlannerPage() {
   };
 
   const openSlotPicker = (date: Date, slot: MealSlot) => {
+    if (!isSlotEditable(date, slot)) {
+      toast({
+        title: "Slot locked",
+        description: `You cannot edit ${slot} for ${format(date, "MMM d")} because the time has passed.`,
+        variant: "destructive",
+      });
+      return;
+    }
     setSelectedDate(date);
     setSelectedSlot(slot);
     setIsSlotDialogOpen(true);
@@ -89,7 +122,7 @@ export default function MealPlannerPage() {
     setSaving(true);
     const result = await saveMealPlan(selectedDate, selectedSlot, recipeId);
     if (result.success) {
-      await loadData(); // refresh the calendar
+      await loadData();
       toast({
         title: recipeId ? "Meal assigned" : "Meal removed",
         description: recipeId
@@ -148,166 +181,189 @@ export default function MealPlannerPage() {
   };
 
   return (
-    <AppLayout>
-      <div className="flex flex-col gap-6">
-        {/* Header */}
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold font-headline tracking-tight">Meal Planner</h1>
-            <p className="text-muted-foreground">Plan your week and assign recipes to breakfast, lunch, or dinner.</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={() => setSelectedWeek(d => addDays(d, -7))}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <div className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium">
-              <CalendarIcon className="h-4 w-4 text-primary" />
-              {format(selectedWeek, "MMM d")} - {format(addDays(selectedWeek, 6), "MMM d, yyyy")}
+    <TooltipProvider>
+      <AppLayout>
+        <div className="flex flex-col gap-6">
+          {/* Header */}
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h1 className="text-3xl font-bold font-headline tracking-tight">Meal Planner</h1>
+              <p className="text-muted-foreground">Plan your week and assign recipes to breakfast, lunch, or dinner.</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                ⏰ Breakfast ends at 9:45 AM, Lunch at 1:30 PM, Dinner at 9:45 PM.
+              </p>
             </div>
-            <Button variant="outline" size="icon" onClick={() => setSelectedWeek(d => addDays(d, 7))}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="icon" onClick={() => setSelectedWeek(d => addDays(d, -7))}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <div className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium">
+                <CalendarIcon className="h-4 w-4 text-primary" />
+                {format(selectedWeek, "MMM d")} - {format(addDays(selectedWeek, 6), "MMM d, yyyy")}
+              </div>
+              <Button variant="outline" size="icon" onClick={() => setSelectedWeek(d => addDays(d, 7))}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
-        </div>
 
-        {/* Tabs */}
-        <div className="w-full">
-          <div className="border-b pb-2 mb-4 flex gap-4">
-            <span className="font-semibold text-primary border-b-2 border-primary pb-2">Weekly Calendar</span>
-            <span className="text-muted-foreground">AI Suggestions</span>
-          </div>
+          {/* Weekly Calendar */}
+          <div className="w-full">
+            <div className="border-b pb-2 mb-4 flex gap-4">
+              <span className="font-semibold text-primary border-b-2 border-primary pb-2">Weekly Calendar</span>
+              <span className="text-muted-foreground">AI Suggestions</span>
+            </div>
 
-          {/* Week calendar grid */}
-          {loadingMeals ? (
-            <div className="flex justify-center p-12"><Loader2 className="h-8 w-8 animate-spin" /></div>
-          ) : (
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-7">
-              {weekDays.map((day) => {
-                const dateKey = format(day, "yyyy-MM-dd");
-                const dayPlans = mealPlans[dateKey] || {};
-                return (
-                  <Card key={dateKey} className="border shadow-sm">
-                    <CardHeader className="p-3 border-b text-center">
-                      <CardTitle className="text-sm font-bold">
-                        {format(day, "EEE")}
-                        <span className="block text-xl font-headline mt-1">{format(day, "d")}</span>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-2 space-y-2">
-                      {(["breakfast", "lunch", "dinner"] as MealSlot[]).map((slot) => {
-                        const recipeId = dayPlans[slot];
-                        const recipeName = getRecipeName(recipeId);
-                        return (
-                          <div
-                            key={slot}
-                            className="rounded-lg border p-2 min-h-[70px] cursor-pointer hover:bg-muted/20 transition-colors"
-                            onClick={() => openSlotPicker(day, slot)}
-                          >
-                            <div className="flex justify-between items-start">
-                              <span className="text-xs font-bold uppercase text-muted-foreground">{slot}</span>
-                              {recipeId && (
-                                <Badge variant="secondary" className="text-[10px] h-5">
-                                  Assigned
-                                </Badge>
+            {loadingMeals ? (
+              <div className="flex justify-center p-12"><Loader2 className="h-8 w-8 animate-spin" /></div>
+            ) : (
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-7">
+                {weekDays.map((day) => {
+                  const dateKey = format(day, "yyyy-MM-dd");
+                  const dayPlans = mealPlans[dateKey] || {};
+                  const isPastDay = isBefore(day, new Date()) && !isToday(day);
+                  return (
+                    <Card key={dateKey} className={`border shadow-sm ${isPastDay ? "opacity-60 bg-muted/30" : ""}`}>
+                      <CardHeader className="p-3 border-b text-center">
+                        <CardTitle className="text-sm font-bold">
+                          {format(day, "EEE")}
+                          <span className="block text-xl font-headline mt-1">{format(day, "d")}</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-2 space-y-2">
+                        {(["breakfast", "lunch", "dinner"] as MealSlot[]).map((slot) => {
+                          const recipeId = dayPlans[slot];
+                          const recipeName = getRecipeName(recipeId);
+                          const editable = !isPastDay && isSlotEditable(day, slot);
+                          return (
+                            <Tooltip key={slot}>
+                              <TooltipTrigger asChild>
+                                <div
+                                  className={`rounded-lg border p-2 min-h-[70px] transition-colors ${
+                                    editable
+                                      ? "cursor-pointer hover:bg-muted/20"
+                                      : "cursor-not-allowed bg-muted/30 opacity-70"
+                                  }`}
+                                  onClick={() => editable && openSlotPicker(day, slot)}
+                                >
+                                  <div className="flex justify-between items-start">
+                                    <span className="text-xs font-bold uppercase text-muted-foreground">{slot}</span>
+                                    {!editable && (
+                                      <Lock className="h-3 w-3 text-muted-foreground" />
+                                    )}
+                                    {recipeId && editable && (
+                                      <Badge variant="secondary" className="text-[10px] h-5">Assigned</Badge>
+                                    )}
+                                    {recipeId && !editable && (
+                                      <Badge variant="outline" className="text-[10px] h-5">Locked</Badge>
+                                    )}
+                                  </div>
+                                  {recipeName ? (
+                                    <p className="text-sm font-medium mt-1 line-clamp-2">{recipeName}</p>
+                                  ) : (
+                                    <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                                      {editable ? <Plus className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
+                                      {editable ? "Tap to add a recipe" : "Time passed"}
+                                    </p>
+                                  )}
+                                </div>
+                              </TooltipTrigger>
+                              {!editable && (
+                                <TooltipContent side="right">
+                                  <p>This {slot} slot is locked because the time has already passed.</p>
+                                </TooltipContent>
                               )}
-                            </div>
-                            {recipeName ? (
-                              <p className="text-sm font-medium mt-1 line-clamp-2">{recipeName}</p>
-                            ) : (
-                              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                                <Plus className="h-3 w-3" /> Tap to add a recipe
-                              </p>
-                            )}
+                            </Tooltip>
+                          );
+                        })}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* AI Suggestions Section */}
+          <div className="mt-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-headline font-bold">AI Meal Suggestions</h2>
+              <Button onClick={handleSuggest} disabled={loadingSuggestions} size="sm" variant="outline">
+                {loadingSuggestions ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
+                Suggest
+              </Button>
+            </div>
+            {suggestions && (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {suggestions.suggestions.map((suggestion, idx) => (
+                  <Card key={idx} className="border shadow-sm">
+                    <CardHeader className="bg-primary/5">
+                      <CardTitle className="text-base">{suggestion.recipeName}</CardTitle>
+                      {suggestion.recipeDescription && (
+                        <CardDescription className="text-xs line-clamp-1">{suggestion.recipeDescription}</CardDescription>
+                      )}
+                    </CardHeader>
+                    <CardContent className="pt-3">
+                      <p className="text-xs font-semibold mb-2">Ingredient status:</p>
+                      <div className="space-y-1">
+                        {suggestion.ingredientStatus.slice(0, 3).map((status, i) => (
+                          <div key={i} className="flex items-center justify-between text-xs">
+                            <span className="flex items-center gap-1 truncate max-w-[60%]">{status.name}</span>
+                            <Badge variant="outline" className={
+                              status.status === "enough" ? "border-primary text-primary" :
+                              status.status === "low" ? "border-orange-500 text-orange-500" : "border-destructive text-destructive"
+                            }>{status.status === "enough" ? "Ready" : status.status === "low" ? "Low" : "Buy"}</Badge>
                           </div>
-                        );
-                      })}
+                        ))}
+                        {suggestion.ingredientStatus.length > 3 && <p className="text-[10px] text-muted-foreground">+{suggestion.ingredientStatus.length - 3} more</p>}
+                      </div>
                     </CardContent>
                   </Card>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* AI Suggestions Section (collapsible or separate) */}
-        <div className="mt-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-headline font-bold">AI Meal Suggestions</h2>
-            <Button onClick={handleSuggest} disabled={loadingSuggestions} size="sm" variant="outline">
-              {loadingSuggestions ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
-              Suggest
-            </Button>
+                ))}
+              </div>
+            )}
           </div>
-          {suggestions && (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {suggestions.suggestions.map((suggestion, idx) => (
-                <Card key={idx} className="border shadow-sm">
-                  <CardHeader className="bg-primary/5">
-                    <CardTitle className="text-base">{suggestion.recipeName}</CardTitle>
-                    {suggestion.recipeDescription && (
-                      <CardDescription className="text-xs line-clamp-1">{suggestion.recipeDescription}</CardDescription>
-                    )}
-                  </CardHeader>
-                  <CardContent className="pt-3">
-                    <p className="text-xs font-semibold mb-2">Ingredient status:</p>
-                    <div className="space-y-1">
-                      {suggestion.ingredientStatus.slice(0, 3).map((status, i) => (
-                        <div key={i} className="flex items-center justify-between text-xs">
-                          <span className="flex items-center gap-1 truncate max-w-[60%]">{status.name}</span>
-                          <Badge variant="outline" className={
-                            status.status === "enough" ? "border-primary text-primary" :
-                            status.status === "low" ? "border-orange-500 text-orange-500" : "border-destructive text-destructive"
-                          }>{status.status === "enough" ? "Ready" : status.status === "low" ? "Low" : "Buy"}</Badge>
-                        </div>
-                      ))}
-                      {suggestion.ingredientStatus.length > 3 && <p className="text-[10px] text-muted-foreground">+{suggestion.ingredientStatus.length - 3} more</p>}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
         </div>
-      </div>
 
-      {/* Slot picker dialog */}
-      <Dialog open={isSlotDialogOpen} onOpenChange={setIsSlotDialogOpen}>
-        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {selectedDate && selectedSlot
-                ? `${format(selectedDate, "EEEE, MMM d")} – ${selectedSlot.charAt(0).toUpperCase() + selectedSlot.slice(1)}`
-                : "Select a Recipe"}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2 py-2">
-            <Button
-              variant="ghost"
-              className="w-full justify-start text-destructive"
-              onClick={() => assignRecipe(null)}
-              disabled={saving}
-            >
-              <X className="mr-2 h-4 w-4" /> Remove current meal
-            </Button>
-            <div className="h-px bg-border my-2" />
-            {recipes.map((recipe) => (
+        {/* Slot picker dialog */}
+        <Dialog open={isSlotDialogOpen} onOpenChange={setIsSlotDialogOpen}>
+          <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {selectedDate && selectedSlot
+                  ? `${format(selectedDate, "EEEE, MMM d")} – ${selectedSlot.charAt(0).toUpperCase() + selectedSlot.slice(1)}`
+                  : "Select a Recipe"}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-2 py-2">
               <Button
-                key={recipe.id}
                 variant="ghost"
-                className="w-full justify-start text-left"
-                onClick={() => assignRecipe(recipe.id)}
+                className="w-full justify-start text-destructive"
+                onClick={() => assignRecipe(null)}
                 disabled={saving}
               >
-                <div className="flex flex-col items-start">
-                  <span>{recipe.name}</span>
-                  <span className="text-xs text-muted-foreground">{recipe.ingredients.length} ingredients</span>
-                </div>
+                <X className="mr-2 h-4 w-4" /> Remove current meal
               </Button>
-            ))}
-            {recipes.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No recipes found. Please add some first.</p>}
-          </div>
-        </DialogContent>
-      </Dialog>
-    </AppLayout>
+              <div className="h-px bg-border my-2" />
+              {recipes.map((recipe) => (
+                <Button
+                  key={recipe.id}
+                  variant="ghost"
+                  className="w-full justify-start text-left"
+                  onClick={() => assignRecipe(recipe.id)}
+                  disabled={saving}
+                >
+                  <div className="flex flex-col items-start">
+                    <span>{recipe.name}</span>
+                    <span className="text-xs text-muted-foreground">{recipe.ingredients.length} ingredients</span>
+                  </div>
+                </Button>
+              ))}
+              {recipes.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No recipes found. Please add some first.</p>}
+            </div>
+          </DialogContent>
+        </Dialog>
+      </AppLayout>
+    </TooltipProvider>
   );
 }
