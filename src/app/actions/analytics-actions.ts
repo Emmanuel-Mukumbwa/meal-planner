@@ -61,10 +61,10 @@ export async function getAnalyticsDashboardData(): Promise<AnalyticsDashboardDat
 
   const now = new Date();
 
+  // ✅ FIX: price is already total, so sum price directly
   const totalInventoryValue = inventory.reduce((sum, item) => {
-    const qty = Number(item.quantity) || 0;
     const price = Number(item.price) || 0;
-    return sum + qty * price;
+    return sum + price;
   }, 0);
 
   const expiredInventoryValue = inventory.reduce((sum, item) => {
@@ -73,9 +73,8 @@ export async function getAnalyticsDashboardData(): Promise<AnalyticsDashboardDat
     const expiry = new Date(item.expiryDate);
     if (Number.isNaN(expiry.getTime()) || isAfter(expiry, now)) return sum;
 
-    const qty = Number(item.quantity) || 0;
     const price = Number(item.price) || 0;
-    return sum + qty * price;
+    return sum + price;
   }, 0);
 
   const lowStockItems = inventory.filter((item) => {
@@ -90,7 +89,6 @@ export async function getAnalyticsDashboardData(): Promise<AnalyticsDashboardDat
     if (Number.isNaN(expiry.getTime())) return false;
 
     const end = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-
     return isWithinInterval(expiry, { start: now, end });
   }).length;
 
@@ -118,6 +116,7 @@ export async function getAnalyticsDashboardData(): Promise<AnalyticsDashboardDat
       )
     : 0;
 
+  // Weekly inventory adds – use price directly
   const weeklyInventoryAdds = Array.from({ length: 7 }, (_, i) => {
     const day = startOfDay(subDays(now, 6 - i));
     return {
@@ -144,17 +143,16 @@ export async function getAnalyticsDashboardData(): Promise<AnalyticsDashboardDat
     const price = Number(item.price) || 0;
 
     bucket.quantity += qty;
-    bucket.value += qty * price;
+    bucket.value += price; // ✅ use price directly
   });
 
+  // Category value distribution – use price directly
   const categoryMap = new Map<string, number>();
 
   inventory.forEach((item) => {
     const category = (item.category || "Uncategorized").trim() || "Uncategorized";
-    const qty = Number(item.quantity) || 0;
     const price = Number(item.price) || 0;
-
-    categoryMap.set(category, (categoryMap.get(category) || 0) + qty * price);
+    categoryMap.set(category, (categoryMap.get(category) || 0) + price);
   });
 
   const categoryValueDistribution = Array.from(categoryMap.entries())
@@ -171,22 +169,21 @@ export async function getAnalyticsDashboardData(): Promise<AnalyticsDashboardDat
     healthy: 3,
   };
 
+  // Watchlist – use price directly for value
   const watchlist: AnalyticsWatchlistItem[] = inventory
     .map((item) => {
       const qty = Number(item.quantity) || 0;
       const threshold = Number(item.lowStockThreshold) || 0;
-      const value = qty * (Number(item.price) || 0);
+      const value = Number(item.price) || 0; // ✅ already total
 
       let daysLeft: number | null = null;
       let status: AnalyticsWatchlistItem["status"] = "healthy";
 
       if (item.expiryDate) {
         const expiry = new Date(item.expiryDate);
-
         if (!Number.isNaN(expiry.getTime())) {
           const diff = expiry.getTime() - now.getTime();
           daysLeft = Math.ceil(diff / (1000 * 60 * 60 * 24));
-
           if (daysLeft < 0) status = "expired";
           else if (daysLeft <= 7) status = "expiring";
         }
@@ -213,11 +210,9 @@ export async function getAnalyticsDashboardData(): Promise<AnalyticsDashboardDat
       if (statusOrder[a.status] !== statusOrder[b.status]) {
         return statusOrder[a.status] - statusOrder[b.status];
       }
-
       if (a.daysLeft === null && b.daysLeft === null) return b.value - a.value;
       if (a.daysLeft === null) return 1;
       if (b.daysLeft === null) return -1;
-
       return a.daysLeft - b.daysLeft;
     })
     .slice(0, 8);
