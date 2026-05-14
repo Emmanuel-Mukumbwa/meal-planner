@@ -95,4 +95,8 @@ CREATE TABLE IF NOT EXISTS meal_plans (
     FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE,
     UNIQUE KEY unique_meal_slot (user_id, date, slot),
     INDEX idx_date (date)
-);
+); 
+
+ALTER TABLE meal_plans
+  ADD COLUMN status ENUM('planned','served') NOT NULL DEFAULT 'planned' AFTER recipe_id,
+  ADD COLUMN servedAt DATETIME NULL AFTER status;
