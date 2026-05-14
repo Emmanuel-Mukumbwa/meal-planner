@@ -60,7 +60,7 @@ export async function deleteInventoryItem(id: string) {
     await pool.execute('DELETE FROM inventory WHERE id = ?', [id]);
     revalidatePath('/inventory');
     revalidatePath('/');
-  } catch (error) {
+  } catch (error) { 
     console.error('Database error in deleteInventoryItem:', error);
     throw new Error('Failed to delete item.');
   }
