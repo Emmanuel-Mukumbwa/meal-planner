@@ -2,14 +2,6 @@
 
 import * as React from "react"
 import { AppLayout } from "@/components/layout/app-layout"
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow  
-} from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -20,7 +12,8 @@ import {
   CircleAlert,
   Loader2,
   Banknote,
-  Edit
+  Edit,
+  Package
 } from "lucide-react"
 import { 
   DropdownMenu,
@@ -43,6 +36,7 @@ import { format, isPast, isWithinInterval, addDays } from "date-fns"
 import { getInventoryItems, addInventoryItem, updateInventoryItem, deleteInventoryItem } from "@/app/actions/inventory-actions"
 import { InventoryItem } from "@/app/lib/types"
 import { useToast } from "@/hooks/use-toast"
+import { useIsMobile } from "@/hooks/use-mobile"  // ✅ fixed import
 
 // Common units for dropdown
 const commonUnits = [
@@ -60,6 +54,7 @@ const commonUnits = [
 
 export default function InventoryPage() {
   const { toast } = useToast()
+  const isMobile = useIsMobile()  // ✅ fixed usage
   const [items, setItems] = React.useState<InventoryItem[]>([])
   const [loading, setLoading] = React.useState(true)
   const [search, setSearch] = React.useState("")
@@ -76,7 +71,7 @@ export default function InventoryPage() {
     expiryDate: "",
     lowStockThreshold: 1,
     unitPrice: 0,
-    totalPrice: 0,        // added for user convenience
+    totalPrice: 0,
     customUnit: "",
   })
 
@@ -95,19 +90,6 @@ export default function InventoryPage() {
 
   const displayUnit = newItem.unit === "other" ? newItem.customUnit : newItem.unit
   const editDisplayUnit = editItem.unit === "other" ? editItem.customUnit : editItem.unit
-
-  // Synchronize unitPrice <-> totalPrice based on quantity
-  const updateUnitPriceFromTotal = (total: number, quantity: number, setter: (value: number) => void) => {
-    if (quantity > 0) {
-      setter(total / quantity)
-    } else {
-      setter(0)
-    }
-  }
-
-  const updateTotalFromUnitPrice = (unit: number, quantity: number, setter: (value: number) => void) => {
-    setter(unit * quantity)
-  }
 
   // Handlers for new item fields
   const handleNewUnitPriceChange = (value: number) => {
@@ -134,7 +116,6 @@ export default function InventoryPage() {
     })
   }
 
-  // Handlers for edit item fields
   const handleEditUnitPriceChange = (value: number) => {
     setEditItem(prev => {
       const unitPrice = value
@@ -191,7 +172,7 @@ export default function InventoryPage() {
         category: newItem.category,
         expiryDate: newItem.expiryDate || undefined,
         lowStockThreshold: newItem.lowStockThreshold,
-        price: newItem.totalPrice,  // use total price from state
+        price: newItem.totalPrice,
       })
       setItems([added as InventoryItem, ...items])
       setIsAddDialogOpen(false)
@@ -276,25 +257,98 @@ export default function InventoryPage() {
       if (quantity <= threshold) return 'bg-destructive/10 text-destructive border-destructive'
       return 'bg-secondary text-secondary-foreground border-border'
     }
-
     const date = new Date(expiryDate)
     if (isPast(date)) return 'bg-destructive text-destructive-foreground border-none'
     if (isWithinInterval(date, { start: new Date(), end: addDays(new Date(), 3) })) return 'bg-orange-500 text-white border-none'
     if (quantity <= threshold) return 'bg-destructive/10 text-destructive border-destructive'
-    
     return 'bg-accent/20 text-primary border-accent'
   }
 
   const getStatusLabel = (expiryDate?: string, quantity: number, threshold: number) => {
-    if (!expiryDate) {
-      return quantity <= threshold ? 'Low Stock' : 'Good'
-    }
+    if (!expiryDate) return quantity <= threshold ? 'Low Stock' : 'Good'
     const date = new Date(expiryDate)
     if (isPast(date)) return 'Expired'
     if (isWithinInterval(date, { start: new Date(), end: addDays(new Date(), 3) })) return 'Expiring Soon'
     if (quantity <= threshold) return 'Low Stock'
     return 'Fresh'
   }
+
+  // Mobile card view component
+  const MobileInventoryList = () => (
+    <div className="space-y-3">
+      {filteredItems.map((item) => {
+        const unitPrice = item.quantity > 0 ? (item.price / item.quantity) : 0
+        const statusColor = getStatusColor(item.expiryDate, item.quantity, item.lowStockThreshold)
+        const statusLabel = getStatusLabel(item.expiryDate, item.quantity, item.lowStockThreshold)
+        return (
+          <div key={item.id} className="bg-card rounded-lg border p-4 shadow-sm">
+            <div className="flex justify-between items-start mb-3">
+              <div>
+                <h3 className="font-bold text-lg">{item.name}</h3>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge variant="secondary" className="text-xs">{item.category}</Badge>
+                  <Badge className={statusColor + " text-xs"}>{statusLabel}</Badge>
+                </div>
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => openEditDialog(item)}>
+                    <Edit className="mr-2 h-4 w-4" /> Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(item.id)}>
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Stock Level:</span>
+                <span className={item.quantity <= item.lowStockThreshold ? "text-destructive font-bold" : ""}>
+                  {item.quantity} {item.unit}
+                  {item.quantity <= item.lowStockThreshold && <CircleAlert className="inline ml-2 h-3 w-3" />}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Total Value:</span>
+                <span className="flex items-center gap-1">
+                  <Banknote className="h-3 w-3 text-primary" />
+                  {new Intl.NumberFormat('en-MW', { style: 'currency', currency: 'MWK' }).format(item.price || 0)}
+                </span>
+              </div>
+              {unitPrice > 0 && (
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Unit Price:</span>
+                  <span>MK{unitPrice.toFixed(2)} / {item.unit}</span>
+                </div>
+              )}
+              {item.expiryDate && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Expires:</span>
+                  <span className={isPast(new Date(item.expiryDate)) ? "text-destructive" : ""}>
+                    {format(new Date(item.expiryDate), "MMM d, yyyy")}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })}
+      {filteredItems.length === 0 && (
+        <div className="text-center py-12 text-muted-foreground border rounded-lg">
+          <Package className="h-12 w-12 mx-auto mb-2 opacity-30" />
+          <p>No items found. Click "Add New Item" to begin.</p>
+        </div>
+      )}
+    </div>
+  )
 
   return (
     <AppLayout>
@@ -311,10 +365,10 @@ export default function InventoryPage() {
                 <Plus className="mr-2 h-4 w-4" /> Add New Item
               </Button>
             </DialogTrigger>
-            <DialogContent className="w-[95vw] max-w-[95vw] sm:max-w-[425px] rounded-lg p-4">
+            <DialogContent className="w-[95vw] max-w-[95vw] sm:max-w-[425px] rounded-lg p-4 max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Add Inventory Item</DialogTitle>
-                <DialogDescription>Enter the item details. Use decimal quantities for partial units (e.g., 0.5 litres).</DialogDescription>
+                <DialogDescription>Enter item details. Use decimals for partial units (e.g., 0.5 litres).</DialogDescription>
               </DialogHeader>
               <div className="grid gap-3 py-3">
                 <div className="grid gap-1.5">
@@ -359,7 +413,7 @@ export default function InventoryPage() {
                   <div className="grid gap-1.5">
                     <label className="text-sm font-medium">Total Price (MK)</label>
                     <Input type="number" min="0" step="0.01" placeholder="e.g., 13000" value={newItem.totalPrice} onChange={e => handleNewTotalPriceChange(parseFloat(e.target.value) || 0)} />
-                    <p className="text-[10px] text-muted-foreground">Total value for {newItem.quantity} {displayUnit}</p>
+                    <p className="text-[10px] text-muted-foreground">Total for {newItem.quantity} {displayUnit}</p>
                   </div>
                 </div>
 
@@ -383,7 +437,7 @@ export default function InventoryPage() {
                   <div className="grid gap-1.5">
                     <label className="text-sm font-medium">Low Stock Threshold</label>
                     <Input type="number" min="0" step="0.01" value={newItem.lowStockThreshold} onChange={e => setNewItem({...newItem, lowStockThreshold: parseFloat(e.target.value) || 0})} />
-                    <p className="text-[10px] text-muted-foreground">Alert when quantity ≤ this value (in {displayUnit})</p>
+                    <p className="text-[10px] text-muted-foreground">Alert when ≤ this (in {displayUnit})</p>
                   </div>
                 </div>
 
@@ -419,44 +473,46 @@ export default function InventoryPage() {
           </div>
         </div>
 
-        {/* Mobile-friendly table container with horizontal scroll */}
-        <div className="rounded-xl border bg-card shadow-sm overflow-x-auto">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center h-64 gap-2">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Loading inventory...</p>
-            </div>
-          ) : (
-            <Table className="min-w-[640px] md:min-w-full">
-              <TableHeader className="bg-muted/30">
-                <TableRow>
-                  <TableHead className="font-semibold">Item Name</TableHead>
-                  <TableHead className="font-semibold">Category</TableHead>
-                  <TableHead className="font-semibold">Stock Level</TableHead>
-                  <TableHead className="font-semibold">Total Value (MK)</TableHead>
-                  <TableHead className="font-semibold">Status</TableHead>
-                  <TableHead className="text-right w-[50px]"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+        {/* Responsive view: cards on mobile, table on desktop */}
+        {loading ? (
+          <div className="flex flex-col items-center justify-center h-64 gap-2">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">Loading inventory...</p>
+          </div>
+        ) : isMobile ? (
+          <MobileInventoryList />
+        ) : (
+          <div className="rounded-xl border bg-card shadow-sm overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-muted/30">
+                <tr className="border-b">
+                  <th className="text-left p-3 font-semibold">Item Name</th>
+                  <th className="text-left p-3 font-semibold">Category</th>
+                  <th className="text-left p-3 font-semibold">Stock Level</th>
+                  <th className="text-left p-3 font-semibold">Total Value (MK)</th>
+                  <th className="text-left p-3 font-semibold">Status</th>
+                  <th className="text-right p-3 w-[50px]"></th>
+                </tr>
+              </thead>
+              <tbody>
                 {filteredItems.map((item) => {
                   const unitPrice = item.quantity > 0 ? (item.price / item.quantity) : 0
                   return (
-                    <TableRow key={item.id} className="transition-colors hover:bg-muted/20">
-                      <TableCell className="font-medium whitespace-nowrap">
+                    <tr key={item.id} className="border-b hover:bg-muted/20">
+                      <td className="p-3 font-medium whitespace-nowrap">
                         {item.name}
                         {unitPrice > 0 && (
                           <span className="ml-2 text-xs text-muted-foreground">
                             (MK{unitPrice.toFixed(2)}/{item.unit})
                           </span>
                         )}
-                      </TableCell>
-                      <TableCell>
+                      </td>
+                      <td className="p-3">
                         <Badge variant="secondary" className="font-normal text-xs">
                           {item.category}
                         </Badge>
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap">
+                      </td>
+                      <td className="p-3 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <span className={item.quantity <= item.lowStockThreshold ? "text-destructive font-bold" : ""}>
                             {item.quantity} {item.unit}
@@ -465,19 +521,19 @@ export default function InventoryPage() {
                             <CircleAlert className="h-4 w-4 text-destructive shrink-0" />
                           )}
                         </div>
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap">
+                      </td>
+                      <td className="p-3 whitespace-nowrap">
                         <div className="flex items-center gap-1 text-sm font-medium">
                           <Banknote className="h-3 w-3 text-primary shrink-0" />
                           {new Intl.NumberFormat('en-MW', { style: 'currency', currency: 'MWK' }).format(item.price || 0)}
                         </div>
-                      </TableCell>
-                      <TableCell>
+                      </td>
+                      <td className="p-3">
                         <Badge className={getStatusColor(item.expiryDate, item.quantity, item.lowStockThreshold) + " text-xs"}>
                           {getStatusLabel(item.expiryDate, item.quantity, item.lowStockThreshold)}
                         </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
+                      </td>
+                      <td className="p-3 text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -494,26 +550,26 @@ export default function InventoryPage() {
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
+                      </td>
+                    </tr>
                   )
                 })}
                 {filteredItems.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                  <tr>
+                    <td colSpan={6} className="p-10 text-center text-muted-foreground">
                       No items found. Click "Add New Item" to begin.
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                  </tr>
                 )}
-              </TableBody>
-            </Table>
-          )}
-        </div>
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="w-[95vw] max-w-[95vw] sm:max-w-[425px] rounded-lg p-4">
+        <DialogContent className="w-[95vw] max-w-[95vw] sm:max-w-[425px] rounded-lg p-4 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Inventory Item</DialogTitle>
             <DialogDescription>Update the item details. Adjust low stock threshold to avoid unwanted alerts.</DialogDescription>
@@ -561,7 +617,7 @@ export default function InventoryPage() {
               <div className="grid gap-1.5">
                 <label className="text-sm font-medium">Total Price (MK)</label>
                 <Input type="number" min="0" step="0.01" value={editItem.totalPrice} onChange={e => handleEditTotalPriceChange(parseFloat(e.target.value) || 0)} />
-                <p className="text-[10px] text-muted-foreground">Total value for {editItem.quantity} {editDisplayUnit}</p>
+                <p className="text-[10px] text-muted-foreground">Total for {editItem.quantity} {editDisplayUnit}</p>
               </div>
             </div>
 
@@ -585,7 +641,7 @@ export default function InventoryPage() {
               <div className="grid gap-1.5">
                 <label className="text-sm font-medium">Low Stock Threshold</label>
                 <Input type="number" min="0" step="0.01" value={editItem.lowStockThreshold} onChange={e => setEditItem({...editItem, lowStockThreshold: parseFloat(e.target.value) || 0})} />
-                <p className="text-[10px] text-muted-foreground">Alert when quantity ≤ this value (in {editDisplayUnit})</p>
+                <p className="text-[10px] text-muted-foreground">Alert when ≤ this (in {editDisplayUnit})</p>
               </div>
             </div>
 
