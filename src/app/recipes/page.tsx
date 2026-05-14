@@ -16,15 +16,14 @@ import {
   Trash2,
   X,
   Pencil,
-  Eye,
 } from "lucide-react";
 import {
   getRecipes,
   addRecipe,
   updateRecipe,
   deleteRecipe,
-  importRecipeFromURL,
 } from "@/app/actions/recipe-actions";
+import { importRecipeFromURL } from "@/ai/flows/import-recipe-from-url";
 import { Recipe } from "@/app/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -36,7 +35,6 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 
 type RecipeIngredientInput = {
@@ -244,7 +242,6 @@ export default function RecipesPage() {
 
   const startEdit = () => {
     if (!selectedRecipe) return;
-    // Convert existing recipe to edit form
     const form: CustomRecipeForm = {
       name: selectedRecipe.name,
       description: selectedRecipe.description || "",
@@ -264,7 +261,7 @@ export default function RecipesPage() {
     setEditForm(null);
   };
 
-  // Edit handlers (similar to create)
+  // Edit handlers
   const updateEditIngredient = (index: number, field: keyof RecipeIngredientInput, value: string) => {
     if (!editForm) return;
     const newIngredients = [...editForm.ingredients];
@@ -336,7 +333,7 @@ export default function RecipesPage() {
     setUpdatingRecipe(true);
     try {
       await updateRecipe(selectedRecipe.id, { name, description: description || undefined, ingredients, steps });
-      await loadRecipes(); // refresh list
+      await loadRecipes();
       setIsViewDialogOpen(false);
       setIsEditMode(false);
       setEditForm(null);
