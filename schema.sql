@@ -82,3 +82,17 @@ CREATE TABLE IF NOT EXISTS notifications (
     INDEX idx_isRead (isRead),
     INDEX idx_relatedId (relatedId)
 );
+
+-- 7. Meal Plans Table
+CREATE TABLE IF NOT EXISTS meal_plans (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36) DEFAULT 'default', -- for future multi‑user
+    date DATE NOT NULL,
+    slot ENUM('breakfast', 'lunch', 'dinner', 'snack') NOT NULL,
+    recipe_id VARCHAR(36) NOT NULL,
+    createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_meal_slot (user_id, date, slot),
+    INDEX idx_date (date)
+);
