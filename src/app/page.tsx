@@ -39,10 +39,10 @@ export default function Dashboard() {
           return diff > 0 && diff < 48 * 60 * 60 * 1000
         }).length
 
+        // ✅ FIX: price is already total value, just sum it
         const value = inventory.reduce((sum, item) => {
-          const quantity = Number(item.quantity) || 0
           const price = Number(item.price) || 0
-          return sum + quantity * price
+          return sum + price
         }, 0)
 
         setStats({
