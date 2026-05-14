@@ -2,7 +2,16 @@
 
 import pool from "@/lib/db"
 import { revalidatePath } from "next/cache"
+import { v4 as uuidv4 } from "uuid"
 import type { NotificationItem, NotificationType } from "@/app/lib/notification-types"
+
+function toMysqlDatetime(value: string | Date) {
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return new Date().toISOString().slice(0, 19).replace("T", " ")
+  }
+  return date.toISOString().slice(0, 19).replace("T", " ")
+}
 
 function toIsoDate(value: unknown): string {
   if (value instanceof Date) return value.toISOString()
@@ -27,6 +36,86 @@ function rowToNotification(row: any): NotificationItem {
     isRead: Number(row.isRead) === 1,
     readAt: row.readAt ? toIsoDate(row.readAt) : null,
     createdAt: toIsoDate(row.createdAt),
+  }
+}
+
+export async function createNotification(input: {
+  title: string
+  message: string
+  type?: NotificationType
+  relatedType?: string | null
+  relatedId?: string | null
+  notifyAt?: string | Date
+}) {
+  try {
+    const id = uuidv4()
+    const notifyAt = input.notifyAt ? toMysqlDatetime(input.notifyAt) : toMysqlDatetime(new Date())
+
+    await pool.execute(
+      `INSERT INTO notifications
+        (id, title, message, type, relatedType, relatedId, notifyAt, isRead)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
+      [
+        id,
+        input.title,
+        input.message,
+        input.type || "system",
+        input.relatedType || null,
+        input.relatedId || null,
+        notifyAt,
+      ]
+    )
+
+    revalidatePath("/notifications")
+    revalidatePath("/")
+
+    return { success: true, id }
+  } catch (error) {
+    console.error("Database error in createNotification:", error)
+    throw new Error("Failed to create notification.")
+  }
+}
+
+export async function createLowStockNotification(input: {
+  inventoryId: string
+  inventoryName: string
+  remainingQuantity: number
+  unit: string
+  threshold: number
+}) {
+  try {
+    const [existing] = await pool.execute(
+      `SELECT id
+       FROM notifications
+       WHERE isRead = 0
+         AND type = 'system'
+         AND relatedType = 'inventory'
+         AND relatedId = ?
+         AND title = 'Low stock alert'
+       LIMIT 1`,
+      [input.inventoryId]
+    )
+
+    const existingRows = existing as any[]
+    if (existingRows.length > 0) {
+      return { created: false }
+    }
+
+    const message = `${input.inventoryName} is now low in stock. Remaining: ${Number(input.remainingQuantity).toFixed(2)} ${input.unit}. Threshold: ${Number(input.threshold).toFixed(2)} ${input.unit}.`
+
+    const created = await createNotification({
+      title: "Low stock alert",
+      message,
+      type: "system",
+      relatedType: "inventory",
+      relatedId: input.inventoryId,
+      notifyAt: new Date(),
+    })
+
+    return { created: true, id: created.id }
+  } catch (error) {
+    console.error("Database error in createLowStockNotification:", error)
+    return { created: false }
   }
 }
 
