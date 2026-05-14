@@ -121,6 +121,3 @@ export async function deleteRecipe(id: string) {
     throw new Error('Failed to delete recipe.');
   }
 }
-
-// Re‑export from AI flow for convenience
-export { importRecipeFromURL } from '@/ai/flows/import-recipe-from-url';
